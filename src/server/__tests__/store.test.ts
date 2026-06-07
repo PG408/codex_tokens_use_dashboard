@@ -142,6 +142,36 @@ describe('dashboard store', () => {
     });
   });
 
+  it('deduplicates repeated rollout snapshots for the same session', async () => {
+    const store = await createDashboardStore();
+
+    store.replaceAll(parsedSession('session-a', 50), parsedSession('session-a', 300));
+    const dashboard = store.getDashboardData({});
+
+    expect(dashboard.kpis.totalTokens).toBe(330);
+    expect(dashboard.sessions).toHaveLength(1);
+    expect(dashboard.prompts.map((prompt) => prompt.promptPreview)).toEqual([
+      'session-a dashboard analysis'
+    ]);
+  });
+
+  it('namespaces Prompt and token call ids by their final session', async () => {
+    const store = await createDashboardStore();
+    const first = parsedSession('session-a', 50);
+    const second = parsedSession('session-b', 300);
+    second.prompts[0].promptId = first.prompts[0].promptId;
+    second.tokenCalls[0].callId = first.tokenCalls[0].callId;
+    second.tokenCalls[0].promptId = first.prompts[0].promptId;
+    second.tokenCalls[1].promptId = first.prompts[0].promptId;
+
+    store.replaceAll(first, second);
+    const dashboard = store.getDashboardData({});
+
+    expect(dashboard.kpis.totalTokens).toBe(410);
+    expect(dashboard.sessions).toHaveLength(2);
+    expect(dashboard.prompts).toHaveLength(2);
+  });
+
   it('returns null cache hit rate when input tokens are zero', async () => {
     const store = await createDashboardStore();
 

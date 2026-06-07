@@ -220,6 +220,120 @@ const insertTokenCall = (
   ]);
 };
 
+const compareSessionSnapshot = (
+  left: ParsedSession,
+  right: ParsedSession
+): number => {
+  const totalTokenDelta =
+    left.tokenCalls.reduce((total, tokenCall) => total + tokenCall.totalTokens, 0) -
+    right.tokenCalls.reduce((total, tokenCall) => total + tokenCall.totalTokens, 0);
+  if (totalTokenDelta !== 0) {
+    return totalTokenDelta;
+  }
+
+  const callDelta = left.tokenCalls.length - right.tokenCalls.length;
+  if (callDelta !== 0) {
+    return callDelta;
+  }
+
+  const promptDelta = left.prompts.length - right.prompts.length;
+  if (promptDelta !== 0) {
+    return promptDelta;
+  }
+
+  const lastSeenDelta =
+    Date.parse(left.session.lastSeenAt) - Date.parse(right.session.lastSeenAt);
+  if (lastSeenDelta !== 0) {
+    return lastSeenDelta;
+  }
+
+  return left.session.sourceFile.localeCompare(right.session.sourceFile);
+};
+
+const deduplicateSessionSnapshots = (
+  parsedSessions: ParsedSession[]
+): ParsedSession[] => {
+  const snapshotsBySessionId = new Map<string, ParsedSession>();
+
+  parsedSessions.forEach((parsedSession) => {
+    const current = snapshotsBySessionId.get(parsedSession.session.sessionId);
+    if (
+      current === undefined ||
+      compareSessionSnapshot(parsedSession, current) > 0
+    ) {
+      snapshotsBySessionId.set(parsedSession.session.sessionId, parsedSession);
+    }
+  });
+
+  return [...snapshotsBySessionId.values()];
+};
+
+const countRecordIds = (
+  parsedSessions: ParsedSession[],
+  selectRecords: (parsedSession: ParsedSession) => Array<{ id: string }>
+): Map<string, number> => {
+  const counts = new Map<string, number>();
+  parsedSessions.forEach((parsedSession) => {
+    selectRecords(parsedSession).forEach((record) => {
+      counts.set(record.id, (counts.get(record.id) ?? 0) + 1);
+    });
+  });
+  return counts;
+};
+
+const namespaceSessionRecords = (
+  parsedSessions: ParsedSession[]
+): ParsedSession[] => {
+  const promptIdCounts = countRecordIds(parsedSessions, (parsedSession) =>
+    parsedSession.prompts.map((prompt) => ({ id: prompt.promptId }))
+  );
+  const callIdCounts = countRecordIds(parsedSessions, (parsedSession) =>
+    parsedSession.tokenCalls.map((tokenCall) => ({ id: tokenCall.callId }))
+  );
+
+  return parsedSessions.map((parsedSession) => {
+    const promptIdByOriginalId = new Map<string, string>();
+    const promptCounts = new Map<string, number>();
+    const callCounts = new Map<string, number>();
+    const sessionId = parsedSession.session.sessionId;
+    const prompts = parsedSession.prompts.map((prompt) => {
+      const count = (promptCounts.get(prompt.promptId) ?? 0) + 1;
+      promptCounts.set(prompt.promptId, count);
+      const promptId =
+        (promptIdCounts.get(prompt.promptId) ?? 0) > 1
+          ? `${sessionId}:${prompt.promptId}:${count}`
+          : prompt.promptId;
+      promptIdByOriginalId.set(prompt.promptId, promptId);
+      return {
+        ...prompt,
+        promptId,
+        sessionId
+      };
+    });
+    const tokenCalls = parsedSession.tokenCalls.map((tokenCall) => {
+      const count = (callCounts.get(tokenCall.callId) ?? 0) + 1;
+      callCounts.set(tokenCall.callId, count);
+      const callId =
+        (callIdCounts.get(tokenCall.callId) ?? 0) > 1
+          ? `${sessionId}:${tokenCall.callId}:${count}`
+          : tokenCall.callId;
+      return {
+        ...tokenCall,
+        callId,
+        sessionId,
+        promptId:
+          promptIdByOriginalId.get(tokenCall.promptId) ?? tokenCall.promptId
+      };
+    });
+
+    return {
+      ...parsedSession,
+      prompts,
+      tokenCalls
+    };
+  });
+};
+
 export const createDashboardStore = async (): Promise<DashboardStore> => {
   const SQL = await sqlModule;
   const db = new SQL.Database();
@@ -228,6 +342,9 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
   createSchema(db);
 
   const replaceAll = (...parsedSessions: ParsedSession[]): void => {
+    const sessionSnapshots =
+      namespaceSessionRecords(deduplicateSessionSnapshots(parsedSessions));
+
     db.run('BEGIN');
     try {
       db.run('DELETE FROM token_calls');
@@ -246,7 +363,7 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           cli_version,
           last_seen_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        parsedSessions.map((parsed) => parsed.session),
+        sessionSnapshots.map((parsed) => parsed.session),
         insertSession
       );
       runStatement(
@@ -263,7 +380,7 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           reasoning_output_tokens,
           total_tokens
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        parsedSessions.flatMap((parsed) => parsed.prompts),
+        sessionSnapshots.flatMap((parsed) => parsed.prompts),
         insertPrompt
       );
       runStatement(
@@ -279,7 +396,7 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           reasoning_output_tokens,
           total_tokens
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        parsedSessions.flatMap((parsed) => parsed.tokenCalls),
+        sessionSnapshots.flatMap((parsed) => parsed.tokenCalls),
         insertTokenCall
       );
 
