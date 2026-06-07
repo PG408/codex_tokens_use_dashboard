@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/server/index.ts",
-    "build": "tsc -p tsconfig.node.json && vite build",
+    "dev": "NODE_ENV=development tsx src/server/index.ts",
+    "build": "npm run build:server && vite build",
+    "build:server": "tsc -p tsconfig.server-build.json",
+    "package:share": "npm run build && rm -f codex-token-monitor-mvp.zip && zip -r codex-token-monitor-mvp.zip README.md start.command package.json package-lock.json index.html vite.config.ts tsconfig.json tsconfig.node.json tsconfig.server-build.json src dist dist-server",
+    "start": "node dist-server/server/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"

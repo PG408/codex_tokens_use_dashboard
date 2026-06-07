@@ -1,13 +1,16 @@
-import { createServer as createViteServer } from 'vite';
+import { resolve } from 'node:path';
+import express from 'express';
 import { createDashboardApi } from './api.js';
+import { getServerConfig } from './config.js';
 
-const host = '127.0.0.1';
-const port = 4317;
+const clientDistPath = resolve('dist');
 
 const start = async (): Promise<void> => {
-  const app = await createDashboardApi();
+  const config = getServerConfig();
+  const app = await createDashboardApi(config);
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV === 'development') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       appType: 'spa',
       server: {
@@ -15,10 +18,23 @@ const start = async (): Promise<void> => {
       }
     });
     app.use(vite.middlewares);
+  } else {
+    app.use(express.static(clientDistPath));
+    app.use((req, res, next) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+        res.sendFile(resolve(clientDistPath, 'index.html'));
+        return;
+      }
+
+      next();
+    });
   }
 
-  app.listen(port, host, () => {
-    console.log(`Codex Token Dashboard listening on http://${host}:${port}`);
+  app.listen(config.port, config.host, () => {
+    console.log(
+      `Codex Token Dashboard listening on http://${config.host}:${config.port}`
+    );
+    console.log(`Reading sessions from ${config.codexSessionPattern}`);
   });
 };
 

@@ -1,8 +1,11 @@
 .superpowers/
 node_modules/
 dist/
+dist-server/
 .DS_Store
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.zip
+codex-token-monitor-mvp/
 .data/
