@@ -4,6 +4,7 @@ import type { DashboardPrompt, DashboardSession } from '../clientTypes.js';
 import { PromptComposition } from '../components/PromptComposition.js';
 import { PromptTable } from '../components/PromptTable.js';
 import { SessionRanking } from '../components/SessionRanking.js';
+import { Toolbar } from '../components/Toolbar.js';
 
 const prompt = (id: string, sessionId = 'session-alpha'): DashboardPrompt => ({
   promptId: id,
@@ -93,5 +94,32 @@ describe('dashboard components', () => {
     const html = renderToStaticMarkup(<PromptComposition prompt={null} />);
 
     expect(html).not.toContain('lucide-x');
+  });
+
+  it('renders quick ranges and custom date inputs in the toolbar', () => {
+    const html = renderToStaticMarkup(
+      <Toolbar
+        dateRange={{ from: '2026-06-01', to: '2026-06-07' }}
+        isRefreshing={false}
+        lastRefreshed="2026-06-07T01:00:00.000Z"
+        searchTerm=""
+        selectedSessionId=""
+        sessionOptions={[]}
+        timeRange="custom"
+        onDateRangeChange={() => undefined}
+        onRefresh={() => undefined}
+        onSearchTermChange={() => undefined}
+        onSessionChange={() => undefined}
+        onTimeRangeChange={() => undefined}
+      />
+    );
+
+    expect(html).toContain('Quick time ranges');
+    expect(html).toContain('Today');
+    expect(html).toContain('90D');
+    expect(html).toContain('Custom');
+    expect(html).toContain('type="date"');
+    expect(html).toContain('2026-06-01');
+    expect(html).toContain('2026-06-07');
   });
 });

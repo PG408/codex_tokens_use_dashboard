@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardData } from '../shared/types.js';
 import type {
+  DateRange,
   DashboardSession,
   PromptSortKey,
   SessionSortKey,
@@ -55,27 +56,56 @@ const navItems = [
   { label: 'Settings', icon: Settings }
 ];
 
-const timeRangeToQuery = (timeRange: TimeRange): URLSearchParams => {
+const dateString = (date: Date): string => date.toISOString().slice(0, 10);
+
+const setDateRangeParams = (
+  params: URLSearchParams,
+  dateRange: DateRange
+): void => {
+  if (dateRange.from) {
+    params.set('from', dateRange.from);
+  }
+  if (dateRange.to) {
+    params.set('to', dateRange.to);
+  }
+};
+
+export const timeRangeToQuery = (
+  timeRange: TimeRange,
+  dateRange: DateRange
+): URLSearchParams => {
   const params = new URLSearchParams();
   if (timeRange === 'all') {
     return params;
   }
 
-  const days = timeRange === '7d' ? 7 : 30;
+  if (timeRange === 'custom') {
+    setDateRangeParams(params, dateRange);
+    return params;
+  }
+
+  const daysByRange: Record<Exclude<TimeRange, 'all' | 'custom'>, number> = {
+    today: 1,
+    '7d': 7,
+    '30d': 30,
+    '90d': 90
+  };
+  const days = daysByRange[timeRange];
   const to = new Date();
   const from = new Date(to);
   from.setDate(to.getDate() - (days - 1));
-  params.set('from', from.toISOString().slice(0, 10));
-  params.set('to', to.toISOString().slice(0, 10));
+  params.set('from', dateString(from));
+  params.set('to', dateString(to));
   return params;
 };
 
-const dashboardQuery = (
+export const dashboardQuery = (
   timeRange: TimeRange,
+  dateRange: DateRange,
   sessionId: string,
   searchTerm: string
 ): string => {
-  const params = timeRangeToQuery(timeRange);
+  const params = timeRangeToQuery(timeRange, dateRange);
   if (sessionId) {
     params.set('sessionId', sessionId);
   }
@@ -141,6 +171,7 @@ export const App = () => {
     Array<{ value: string; label: string }>
   >([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' });
   const [sessionId, setSessionId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPromptId, setSelectedPromptId] = useState('');
@@ -163,8 +194,8 @@ export const App = () => {
   const currentQueryRef = useRef('');
 
   const query = useMemo(
-    () => dashboardQuery(timeRange, sessionId, searchTerm),
-    [timeRange, sessionId, searchTerm]
+    () => dashboardQuery(timeRange, dateRange, sessionId, searchTerm),
+    [timeRange, dateRange, sessionId, searchTerm]
   );
   currentQueryRef.current = query;
 
@@ -356,11 +387,13 @@ export const App = () => {
 
         <Toolbar
           isRefreshing={isRefreshing}
+          dateRange={dateRange}
           lastRefreshed={dashboard.refreshedAt}
           searchTerm={searchTerm}
           selectedSessionId={sessionId}
           sessionOptions={sessionOptions}
           timeRange={timeRange}
+          onDateRangeChange={setDateRange}
           onRefresh={() => void loadDashboard('refresh')}
           onSearchTermChange={setSearchTerm}
           onSessionChange={setSessionId}

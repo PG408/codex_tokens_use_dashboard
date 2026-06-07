@@ -184,7 +184,7 @@ button {
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(210px, 1.1fr) minmax(170px, 0.8fr) minmax(260px, 2fr) auto minmax(180px, auto);
+  grid-template-columns: minmax(380px, 1.45fr) minmax(170px, 0.75fr) minmax(260px, 1.6fr) auto minmax(150px, auto);
   gap: 16px;
   align-items: end;
   padding: 16px 0;
@@ -223,6 +223,63 @@ button {
 .field-control select {
   height: 38px;
   padding: 0 12px;
+}
+
+.time-field {
+  min-width: 360px;
+}
+
+.quick-range-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(54px, 1fr));
+  gap: 6px;
+}
+
+.quick-range-button {
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-range-button.active {
+  border-color: color-mix(in srgb, var(--teal) 38%, var(--border));
+  background: color-mix(in srgb, var(--teal) 9%, var(--background));
+  color: var(--teal);
+}
+
+.date-range-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.date-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  background: var(--background);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.date-input-wrap input {
+  height: 36px;
+  min-width: 0;
+  padding: 0;
+}
+
+.date-input-wrap span {
+  flex: 0 0 auto;
 }
 
 .select-wrap,
@@ -871,6 +928,10 @@ button {
     grid-column: auto;
   }
 
+  .time-field {
+    min-width: 0;
+  }
+
   .kpi-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -893,6 +954,14 @@ button {
 }
 
 @media (max-width: 520px) {
+  .quick-range-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .date-range-row {
+    grid-template-columns: 1fr;
+  }
+
   .kpi-strip {
     grid-template-columns: 1fr;
   }
