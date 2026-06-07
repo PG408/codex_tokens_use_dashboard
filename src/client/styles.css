@@ -659,6 +659,32 @@ button {
   color: var(--muted);
 }
 
+.session-display-cell {
+  max-width: 210px;
+  white-space: normal;
+}
+
+.session-display-cell strong,
+.session-display-cell span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-display-cell strong {
+  white-space: nowrap;
+}
+
+.session-display-cell span {
+  display: -webkit-box;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .compact-table th:first-child,
 .compact-table td:first-child {
   width: 34px;

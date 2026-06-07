@@ -1,6 +1,11 @@
 import { Info } from 'lucide-react';
 import type { DashboardSession, SessionSortKey } from '../clientTypes.js';
 import { formatNumber, formatPercent } from '../formatters.js';
+import {
+  projectNameFromCwd,
+  sessionHoverTitle,
+  sessionName
+} from '../sessionDisplay.js';
 
 type SortState = {
   key: SessionSortKey;
@@ -11,11 +16,6 @@ type SessionRankingProps = {
   sessions: DashboardSession[];
   sort: SortState;
   onSortChange: (sort: SortState) => void;
-};
-
-const sessionLabel = (sessionId: string): string => {
-  const parts = sessionId.split('-');
-  return parts.length > 2 ? parts.slice(0, 3).join('-') : sessionId;
 };
 
 const sortOptions: Array<{ label: string; value: SessionSortKey }> = [
@@ -82,9 +82,9 @@ export const SessionRanking = ({
             {sessions.slice(0, 10).map((session, index) => (
               <tr key={session.sessionId}>
                 <td>{index + 1}</td>
-                <td>
-                  <strong>{sessionLabel(session.sessionId)}</strong>
-                  <span>{session.modelProvider || 'unknown model'}</span>
+                <td className="session-display-cell" title={sessionHoverTitle(session)}>
+                  <strong>{projectNameFromCwd(session.cwd)}</strong>
+                  <span>{sessionName(session)}</span>
                 </td>
                 <td>{formatNumber(session.totalTokens)}</td>
                 <td>{formatNumber(session.inputTokens)}</td>

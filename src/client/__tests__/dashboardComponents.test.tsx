@@ -18,7 +18,9 @@ const prompt = (id: string, sessionId = 'session-alpha'): DashboardPrompt => ({
   reasoningOutputTokens: 10,
   totalTokens: 150,
   inputCacheHitRate: 0.25,
-  model: 'gpt-5'
+  cwd: '/tmp/project-alpha',
+  model: 'gpt-5',
+  sessionName: 'Inspect dashboard controls'
 });
 
 const session = (id: string): DashboardSession => ({
@@ -35,11 +37,12 @@ const session = (id: string): DashboardSession => ({
   outputTokens: 50,
   reasoningOutputTokens: 10,
   totalTokens: 150,
-  inputCacheHitRate: 0.25
+  inputCacheHitRate: 0.25,
+  sessionName: 'Inspect dashboard controls'
 });
 
 describe('dashboard components', () => {
-  it('renders prompt session ids as non-clickable text', () => {
+  it('renders session display labels with session id tooltips', () => {
     const html = renderToStaticMarkup(
       <PromptTable
         prompts={[prompt('prompt-1')]}
@@ -50,7 +53,9 @@ describe('dashboard components', () => {
       />
     );
 
-    expect(html).toContain('session-alpha');
+    expect(html).toContain('project-alpha');
+    expect(html).toContain('Inspect dashboard controls');
+    expect(html).toContain('title="Session id: session-alpha"');
     expect(html).toContain('prompt-preview-text');
     expect(html).not.toContain('link-button');
   });
