@@ -25,6 +25,13 @@ const sortOptions: Array<{ label: string; value: SessionSortKey }> = [
   { label: 'Cache hit rate', value: 'inputCacheHitRate' }
 ];
 
+const sessionFooterRange = (sessionCount: number): string => {
+  if (sessionCount === 0) {
+    return '0 of 0';
+  }
+  return `1-${Math.min(sessionCount, 10)} of ${formatNumber(sessionCount)}`;
+};
+
 export const SessionRanking = ({
   sessions,
   sort,
@@ -89,6 +96,6 @@ export const SessionRanking = ({
         </table>
       </div>
     )}
-    <div className="table-foot">1-10 of {formatNumber(sessions.length)} sessions</div>
+    <div className="table-foot">{sessionFooterRange(sessions.length)} sessions</div>
   </article>
 );

@@ -86,6 +86,11 @@ const dashboardQuery = (
   return query ? `?${query}` : '';
 };
 
+export const shouldLoadBootstrapCatchUpQuery = (
+  completedRefreshQuery: string,
+  currentQuery: string
+): boolean => completedRefreshQuery !== currentQuery;
+
 const compareNullableNumber = (
   left: number | null,
   right: number | null
@@ -155,17 +160,18 @@ export const App = () => {
   const latestRequestId = useRef(0);
   const activeRefreshRequestId = useRef(0);
   const activeAbortController = useRef<AbortController | null>(null);
+  const currentQueryRef = useRef('');
 
   const query = useMemo(
     () => dashboardQuery(timeRange, sessionId, searchTerm),
     [timeRange, sessionId, searchTerm]
   );
-  const isUnfilteredQuery =
-    timeRange === 'all' && sessionId === '' && searchTerm.trim() === '';
+  currentQueryRef.current = query;
 
   const loadDashboard = useCallback(
-    async (mode: 'get' | 'refresh') => {
+    async (mode: 'get' | 'refresh', queryOverride?: string) => {
       const isRefresh = mode === 'refresh';
+      const requestQuery = queryOverride ?? query;
       const requestId = latestRequestId.current + 1;
       const abortController = new AbortController();
       latestRequestId.current = requestId;
@@ -180,7 +186,9 @@ export const App = () => {
       }
 
       try {
-        const endpoint = isRefresh ? `/api/refresh${query}` : `/api/dashboard${query}`;
+        const endpoint = isRefresh
+          ? `/api/refresh${requestQuery}`
+          : `/api/dashboard${requestQuery}`;
         const response = await fetch(endpoint, {
           method: isRefresh ? 'POST' : 'GET',
           signal: abortController.signal
@@ -194,7 +202,7 @@ export const App = () => {
         }
 
         setDashboard(nextDashboard);
-        if (isUnfilteredQuery) {
+        if (requestQuery === '') {
           setSessionOptions(sessionOptionsFromDashboard(nextDashboard.sessions));
         }
         setSelectedPromptId((current) => {
@@ -219,6 +227,7 @@ export const App = () => {
             : 'Unable to load dashboard data'
         );
       } finally {
+        let shouldLoadCatchUpQuery = false;
         if (activeAbortController.current === abortController) {
           activeAbortController.current = null;
         }
@@ -227,11 +236,20 @@ export const App = () => {
         }
         if (isRefresh && activeRefreshRequestId.current === requestId) {
           setIsRefreshing(false);
-          hasCompletedBootstrap.current = true;
+          if (!hasCompletedBootstrap.current) {
+            hasCompletedBootstrap.current = true;
+            shouldLoadCatchUpQuery = shouldLoadBootstrapCatchUpQuery(
+              requestQuery,
+              currentQueryRef.current
+            );
+          }
+        }
+        if (shouldLoadCatchUpQuery) {
+          void loadDashboard('get', currentQueryRef.current);
         }
       }
     },
-    [isUnfilteredQuery, query]
+    [query]
   );
 
   useEffect(() => {

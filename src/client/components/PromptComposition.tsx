@@ -1,4 +1,3 @@
-import { X } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { DashboardPrompt } from '../clientTypes.js';
 import { formatDateTime, formatNumber, formatPercent } from '../formatters.js';
@@ -20,7 +19,6 @@ export const PromptComposition = ({ prompt }: PromptCompositionProps) => {
       <aside className="panel composition-panel">
         <div className="rail-heading">
           <h2>Prompt token composition</h2>
-          <X size={16} aria-hidden="true" />
         </div>
         <div className="compact-empty">Select a prompt to inspect composition.</div>
       </aside>
@@ -46,7 +44,6 @@ export const PromptComposition = ({ prompt }: PromptCompositionProps) => {
     <aside className="panel composition-panel">
       <div className="rail-heading">
         <h2>Prompt token composition</h2>
-        <X size={16} aria-hidden="true" />
       </div>
 
       <dl className="prompt-meta">

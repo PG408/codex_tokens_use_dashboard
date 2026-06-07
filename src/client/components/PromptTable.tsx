@@ -22,6 +22,13 @@ const sortLabel: Record<PromptSortKey, string> = {
   inputCacheHitRate: 'Cache'
 };
 
+const promptFooterRange = (promptCount: number): string => {
+  if (promptCount === 0) {
+    return '0 of 0';
+  }
+  return `1-${Math.min(promptCount, 20)} of ${formatNumber(promptCount)}`;
+};
+
 const SortButton = ({
   keyName,
   sort,
@@ -100,15 +107,7 @@ export const PromptTable = ({
                 onClick={() => onPromptSelect(prompt.promptId)}
               >
                 <td>{formatDateTime(prompt.startedAt)}</td>
-                <td>
-                  <button
-                    className="link-button"
-                    type="button"
-                    onClick={() => onPromptSelect(prompt.promptId)}
-                  >
-                    {prompt.sessionId}
-                  </button>
-                </td>
+                <td>{prompt.sessionId}</td>
                 <td>{prompt.model || 'unknown'}</td>
                 <td className="prompt-preview">{prompt.promptPreview}</td>
                 <td>{formatNumber(prompt.totalTokens)}</td>
@@ -125,6 +124,6 @@ export const PromptTable = ({
         </table>
       </div>
     )}
-    <div className="table-foot">1-20 of {formatNumber(prompts.length)} prompts</div>
+    <div className="table-foot">{promptFooterRange(prompts.length)} prompts</div>
   </article>
 );
