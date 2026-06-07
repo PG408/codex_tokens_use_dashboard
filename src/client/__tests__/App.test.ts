@@ -1,9 +1,31 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
+  App,
   dashboardQuery,
   shouldLoadBootstrapCatchUpQuery,
   timeRangeToQuery
 } from '../App.js';
+
+describe('dashboard navigation', () => {
+  it('renders only the clickable MVP navigation targets', () => {
+    const html = renderToStaticMarkup(createElement(App));
+
+    expect(html).toContain('href="#overview"');
+    expect(html).toContain('href="#sessions"');
+    expect(html).toContain('href="#prompts"');
+    expect(html).toContain('href="#composition"');
+    expect(html).toContain('Overview');
+    expect(html).toContain('Sessions');
+    expect(html).toContain('Prompts');
+    expect(html).toContain('Token Composition');
+    expect(html).not.toContain('Models');
+    expect(html).not.toContain('Projects');
+    expect(html).not.toContain('Files');
+    expect(html).not.toContain('Settings');
+  });
+});
 
 describe('shouldLoadBootstrapCatchUpQuery', () => {
   it('requests the current dashboard query when filters change during bootstrap', () => {
@@ -16,15 +38,10 @@ describe('shouldLoadBootstrapCatchUpQuery', () => {
 });
 
 describe('dashboard time filters', () => {
-  it('builds a custom date range query with the existing filters', () => {
+  it('builds a custom date range query', () => {
     expect(
-      dashboardQuery(
-        'custom',
-        { from: '2026-06-01', to: '2026-06-07' },
-        'session-a',
-        'token'
-      )
-    ).toBe('?from=2026-06-01&to=2026-06-07&sessionId=session-a&q=token');
+      dashboardQuery('custom', { from: '2026-06-01', to: '2026-06-07' })
+    ).toBe('?from=2026-06-01&to=2026-06-07');
   });
 
   it('does not add date filters for all available time', () => {

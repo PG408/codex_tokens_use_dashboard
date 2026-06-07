@@ -67,7 +67,7 @@ export const PromptTable = ({
   onPromptSelect,
   onSortChange
 }: PromptTableProps) => (
-  <article className="panel prompt-panel">
+  <article className="panel prompt-panel" id="prompts">
     <div className="table-heading">
       <div className="panel-title">
         <h2>Prompt details</h2>

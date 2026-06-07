@@ -1,22 +1,20 @@
 import {
   AlertCircle,
-  Braces,
+  ChartPie,
   CheckCircle2,
   ClipboardList,
   Code2,
   Database,
   FileText,
-  Folder,
   Home,
-  Moon,
-  Settings
+  Moon
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardData } from '../shared/types.js';
 import type {
   DateRange,
-  DashboardSession,
   DashboardPrompt,
+  DashboardSession,
   PromptSortKey,
   SessionSortKey,
   SortDirection,
@@ -53,14 +51,21 @@ const emptyDashboard: DashboardData = {
 };
 
 const navItems = [
-  { label: 'Overview', icon: Home },
-  { label: 'Sessions', icon: ClipboardList },
-  { label: 'Prompts', icon: FileText },
-  { label: 'Models', icon: Braces },
-  { label: 'Projects', icon: Folder },
-  { label: 'Files', icon: Database },
-  { label: 'Settings', icon: Settings }
+  { label: 'Overview', href: '#overview', icon: Home },
+  { label: 'Sessions', href: '#sessions', icon: ClipboardList },
+  { label: 'Prompts', href: '#prompts', icon: FileText },
+  { label: 'Token Composition', href: '#composition', icon: ChartPie }
 ];
+
+const navHrefFromHash = (): string => {
+  if (typeof window === 'undefined') {
+    return '#overview';
+  }
+
+  return navItems.some((item) => item.href === window.location.hash)
+    ? window.location.hash
+    : '#overview';
+};
 
 const dateString = (date: Date): string => date.toISOString().slice(0, 10);
 
@@ -107,17 +112,9 @@ export const timeRangeToQuery = (
 
 export const dashboardQuery = (
   timeRange: TimeRange,
-  dateRange: DateRange,
-  sessionId: string,
-  searchTerm: string
+  dateRange: DateRange
 ): string => {
   const params = timeRangeToQuery(timeRange, dateRange);
-  if (sessionId) {
-    params.set('sessionId', sessionId);
-  }
-  if (searchTerm.trim()) {
-    params.set('q', searchTerm.trim());
-  }
   const query = params.toString();
   return query ? `?${query}` : '';
 };
@@ -162,14 +159,6 @@ const sortRows = <T extends Record<string, unknown>>(
     return result * multiplier;
   });
 };
-
-const sessionOptionsFromDashboard = (
-  sessions: DashboardSession[]
-): Array<{ value: string; label: string }> =>
-  sessions.map((session) => ({
-    value: session.sessionId,
-    label: session.sessionId
-  }));
 
 const tokenUsageFrom = ({
   inputTokens,
@@ -233,13 +222,9 @@ const aggregateInputSources = (
 
 export const App = () => {
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
-  const [sessionOptions, setSessionOptions] = useState<
-    Array<{ value: string; label: string }>
-  >([]);
+  const [activeNavHref, setActiveNavHref] = useState(navHrefFromHash);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
   const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' });
-  const [sessionId, setSessionId] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedPromptId, setSelectedPromptId] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [promptSort, setPromptSort] = useState<SortState<PromptSortKey>>({
@@ -261,8 +246,8 @@ export const App = () => {
   const currentQueryRef = useRef('');
 
   const query = useMemo(
-    () => dashboardQuery(timeRange, dateRange, sessionId, searchTerm),
-    [timeRange, dateRange, sessionId, searchTerm]
+    () => dashboardQuery(timeRange, dateRange),
+    [timeRange, dateRange]
   );
   currentQueryRef.current = query;
 
@@ -300,9 +285,6 @@ export const App = () => {
         }
 
         setDashboard(nextDashboard);
-        if (requestQuery === '') {
-          setSessionOptions(sessionOptionsFromDashboard(nextDashboard.sessions));
-        }
         setSelectedPromptId((current) => {
           if (nextDashboard.prompts.some((prompt) => prompt.promptId === current)) {
             return current;
@@ -376,6 +358,13 @@ export const App = () => {
     },
     []
   );
+
+  useEffect(() => {
+    const syncActiveNav = () => setActiveNavHref(navHrefFromHash());
+    syncActiveNav();
+    window.addEventListener('hashchange', syncActiveNav);
+    return () => window.removeEventListener('hashchange', syncActiveNav);
+  }, []);
 
   const sortedPrompts = useMemo(
     () => sortRows(dashboard.prompts, promptSort.key, promptSort.direction),
@@ -481,15 +470,18 @@ export const App = () => {
           <span>Codex Token Monitor</span>
         </div>
         <nav className="sidebar-nav" aria-label="Dashboard navigation">
-          <a className="nav-item nav-item-active" href="#overview" aria-current="page">
-            <Home size={17} aria-hidden="true" />
-            <span>Overview</span>
-          </a>
-          {navItems.slice(1).map((item) => (
-            <div className="nav-label" key={item.label}>
+          {navItems.map((item) => (
+            <a
+              className={`nav-item${
+                item.href === activeNavHref ? ' nav-item-active' : ''
+              }`}
+              href={item.href}
+              key={item.label}
+              aria-current={item.href === activeNavHref ? 'page' : undefined}
+            >
               <item.icon size={17} aria-hidden="true" />
               <span>{item.label}</span>
-            </div>
+            </a>
           ))}
         </nav>
         <div className="sidebar-meta">
@@ -513,7 +505,7 @@ export const App = () => {
       </aside>
 
       <main className="dashboard">
-        <header className="page-header">
+        <header className="page-header" id="overview">
           <h1>Overview</h1>
           {error ? (
             <div className="error-banner" role="status">
@@ -532,14 +524,9 @@ export const App = () => {
           isRefreshing={isRefreshing}
           dateRange={dateRange}
           lastRefreshed={dashboard.refreshedAt}
-          searchTerm={searchTerm}
-          selectedSessionId={sessionId}
-          sessionOptions={sessionOptions}
           timeRange={timeRange}
           onDateRangeChange={setDateRange}
           onRefresh={() => void loadDashboard('refresh')}
-          onSearchTermChange={setSearchTerm}
-          onSessionChange={setSessionId}
           onTimeRangeChange={setTimeRange}
         />
 

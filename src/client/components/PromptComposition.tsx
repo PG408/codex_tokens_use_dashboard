@@ -192,7 +192,7 @@ export const PromptComposition = ({ context }: PromptCompositionProps) => {
 
   if (context === null) {
     return (
-      <aside className="panel composition-panel">
+      <aside className="panel composition-panel" id="composition">
         <div className="rail-heading">
           <h2>Token composition</h2>
         </div>
@@ -264,7 +264,7 @@ export const PromptComposition = ({ context }: PromptCompositionProps) => {
   );
 
   return (
-    <aside className="panel composition-panel">
+    <aside className="panel composition-panel" id="composition">
       <div className="rail-heading">
         <h2>Token composition</h2>
       </div>

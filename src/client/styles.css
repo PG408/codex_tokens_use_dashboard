@@ -67,8 +67,7 @@ button {
   padding: 0 0 18px;
 }
 
-.nav-item,
-.nav-label {
+.nav-item {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -82,11 +81,13 @@ button {
 }
 
 .nav-item {
-  color: var(--text);
+  color: var(--muted);
 }
 
-.nav-label {
-  color: var(--muted);
+.nav-item:hover,
+.nav-item:focus-visible {
+  background: var(--surface);
+  color: var(--teal);
 }
 
 .nav-item-active {
@@ -94,6 +95,13 @@ button {
   background: var(--surface);
   color: var(--teal);
   font-weight: 700;
+}
+
+#overview,
+#sessions,
+#prompts,
+#composition {
+  scroll-margin-top: 16px;
 }
 
 .sidebar-meta {
@@ -184,7 +192,7 @@ button {
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(380px, 1.45fr) minmax(170px, 0.75fr) minmax(260px, 1.6fr) auto minmax(150px, auto);
+  grid-template-columns: minmax(380px, 1fr) auto minmax(150px, auto);
   gap: 16px;
   align-items: end;
   padding: 16px 0;
@@ -199,10 +207,7 @@ button {
   font-weight: 600;
 }
 
-.field-control input,
-.field-control select,
-.select-wrap,
-.search-wrap {
+.field-control input {
   min-width: 0;
   height: 38px;
   border: 1px solid var(--border);
@@ -210,7 +215,6 @@ button {
   background: var(--background);
 }
 
-.field-control select,
 .field-control input {
   width: 100%;
   border: 0;
@@ -218,11 +222,6 @@ button {
   color: var(--text);
   outline: none;
   font-size: 13px;
-}
-
-.field-control select {
-  height: 38px;
-  padding: 0 12px;
 }
 
 .time-field {
@@ -280,23 +279,6 @@ button {
 
 .date-input-wrap span {
   flex: 0 0 auto;
-}
-
-.select-wrap,
-.search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 11px;
-}
-
-.select-wrap select {
-  padding: 0;
-}
-
-.search-wrap input {
-  height: 36px;
-  padding: 0;
 }
 
 .refresh-button {
@@ -1044,10 +1026,6 @@ button {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
-  .search-control {
-    grid-column: span 2;
-  }
-
   .last-refreshed {
     border-left: 0;
     padding-left: 0;
@@ -1079,8 +1057,13 @@ button {
   }
 
   .sidebar {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 20;
     height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
   }
 
   .brand {
@@ -1093,8 +1076,7 @@ button {
     padding-bottom: 8px;
   }
 
-  .nav-item,
-  .nav-label {
+  .nav-item {
     flex: 0 0 auto;
     width: auto;
     height: 42px;
@@ -1111,6 +1093,13 @@ button {
     display: none;
   }
 
+  #overview,
+  #sessions,
+  #prompts,
+  #composition {
+    scroll-margin-top: 116px;
+  }
+
   .dashboard {
     padding: 16px;
   }
@@ -1122,8 +1111,7 @@ button {
     flex-direction: column;
   }
 
-  .toolbar,
-  .search-control {
+  .toolbar {
     grid-template-columns: 1fr;
     grid-column: auto;
   }

@@ -180,6 +180,7 @@ describe('dashboard components', () => {
     expect(html).toContain('258.4K');
     expect(html).toContain('Token type contribution');
     expect(html).toContain('Input source contribution');
+    expect(html).toContain('id="composition"');
     expect(html).toContain('User input');
     expect(html).toContain('Tool context');
     expect(html).toContain('Drill down');
@@ -192,14 +193,9 @@ describe('dashboard components', () => {
         dateRange={{ from: '2026-06-01', to: '2026-06-07' }}
         isRefreshing={false}
         lastRefreshed="2026-06-07T01:00:00.000Z"
-        searchTerm=""
-        selectedSessionId=""
-        sessionOptions={[]}
         timeRange="custom"
         onDateRangeChange={() => undefined}
         onRefresh={() => undefined}
-        onSearchTermChange={() => undefined}
-        onSessionChange={() => undefined}
         onTimeRangeChange={() => undefined}
       />
     );
@@ -211,5 +207,9 @@ describe('dashboard components', () => {
     expect(html).toContain('type="date"');
     expect(html).toContain('2026-06-01');
     expect(html).toContain('2026-06-07');
+    expect(html).not.toContain('Session filter');
+    expect(html).not.toContain('All sessions');
+    expect(html).not.toContain('Prompt summary search');
+    expect(html).not.toContain('Search prompt summaries');
   });
 });

@@ -1,11 +1,6 @@
-import { CalendarDays, RefreshCw, Search } from 'lucide-react';
+import { CalendarDays, RefreshCw } from 'lucide-react';
 import type { DateRange, TimeRange } from '../clientTypes.js';
 import { formatDateTime } from '../formatters.js';
-
-type SessionOption = {
-  value: string;
-  label: string;
-};
 
 const quickRanges: Array<{ value: TimeRange; label: string }> = [
   { value: 'today', label: 'Today' },
@@ -20,14 +15,9 @@ type ToolbarProps = {
   dateRange: DateRange;
   isRefreshing: boolean;
   lastRefreshed: string;
-  searchTerm: string;
-  selectedSessionId: string;
-  sessionOptions: SessionOption[];
   timeRange: TimeRange;
   onDateRangeChange: (value: DateRange) => void;
   onRefresh: () => void;
-  onSearchTermChange: (value: string) => void;
-  onSessionChange: (value: string) => void;
   onTimeRangeChange: (value: TimeRange) => void;
 };
 
@@ -35,14 +25,9 @@ export const Toolbar = ({
   dateRange,
   isRefreshing,
   lastRefreshed,
-  searchTerm,
-  selectedSessionId,
-  sessionOptions,
   timeRange,
   onDateRangeChange,
   onRefresh,
-  onSearchTermChange,
-  onSessionChange,
   onTimeRangeChange
 }: ToolbarProps) => {
   const updateDateRange = (value: DateRange) => {
@@ -116,34 +101,6 @@ export const Toolbar = ({
           </label>
         </div>
       </div>
-
-      <label className="field-control">
-        <span>Session filter</span>
-        <select
-          value={selectedSessionId}
-          onChange={(event) => onSessionChange(event.target.value)}
-        >
-          <option value="">All sessions</option>
-          {sessionOptions.map((session) => (
-            <option key={session.value} value={session.value}>
-              {session.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="field-control search-control">
-        <span>Prompt summary search</span>
-        <div className="search-wrap">
-          <Search size={15} aria-hidden="true" />
-          <input
-            type="search"
-            value={searchTerm}
-            placeholder="Search prompt summaries..."
-            onChange={(event) => onSearchTermChange(event.target.value)}
-          />
-        </div>
-      </label>
 
       <button
         className="refresh-button"

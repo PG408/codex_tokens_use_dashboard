@@ -37,7 +37,7 @@ export const SessionRanking = ({
   onSessionSelect,
   onSortChange
 }: SessionRankingProps) => (
-  <article className="panel session-panel">
+  <article className="panel session-panel" id="sessions">
     <div className="table-heading">
       <div className="panel-title">
         <h2>Session ranking</h2>
