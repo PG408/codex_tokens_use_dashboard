@@ -2,6 +2,8 @@
 
 Codex Token Monitor is a local-only dashboard for inspecting token usage from Codex session JSONL files.
 
+![Codex Token Monitor overview dashboard](docs/images/dashboard-overview.jpg)
+
 ## What It Does
 
 - Reads local Codex session files from `~/.codex/sessions/**/rollout-*.jsonl`.
