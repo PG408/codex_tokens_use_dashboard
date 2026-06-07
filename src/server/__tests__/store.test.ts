@@ -194,6 +194,29 @@ describe('dashboard store', () => {
     ]);
   });
 
+  it('includes only the requested UTC day for same-day date-only ranges', async () => {
+    const store = await createDashboardStore();
+
+    store.replaceAll(parsedSession('session-a', 300));
+    const dashboard = store.getDashboardData({
+      from: '2026-06-08',
+      to: '2026-06-08',
+      sessionId: 'session-a',
+      q: 'analysis'
+    });
+
+    expect(dashboard.kpis.totalTokens).toBe(100);
+    expect(dashboard.trend).toHaveLength(1);
+    expect(dashboard.trend[0]).toMatchObject({
+      bucket: '2026-06-08',
+      totalTokens: 100
+    });
+    expect(dashboard.prompts[0]).toMatchObject({
+      promptId: 'session-a:prompt-1',
+      totalTokens: 100
+    });
+  });
+
   it('searches Prompt previews with literal percent and underscore characters', async () => {
     const store = await createDashboardStore();
 
