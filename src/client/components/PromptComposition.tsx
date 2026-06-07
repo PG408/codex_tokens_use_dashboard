@@ -1,9 +1,19 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import type { DashboardPrompt } from '../clientTypes.js';
-import { formatDateTime, formatNumber, formatPercent } from '../formatters.js';
+import type { InputSourceEstimate, TokenUsage } from '../../shared/types.js';
+import { formatNumber, formatPercent } from '../formatters.js';
 
 type PromptCompositionProps = {
-  prompt: DashboardPrompt | null;
+  context: TokenCompositionContext | null;
+};
+
+export type TokenCompositionContext = {
+  kind: 'summary' | 'session' | 'prompt';
+  titleLabel: string;
+  title: string;
+  details: Array<{ label: string; value: string }>;
+  usage: TokenUsage;
+  inputCacheHitRate: number | null;
+  inputSources: InputSourceEstimate[];
 };
 
 const COLORS = {
@@ -13,52 +23,55 @@ const COLORS = {
   reasoning: '#f5b82e'
 };
 
-export const PromptComposition = ({ prompt }: PromptCompositionProps) => {
-  if (prompt === null) {
+export const PromptComposition = ({ context }: PromptCompositionProps) => {
+  if (context === null) {
     return (
       <aside className="panel composition-panel">
         <div className="rail-heading">
-          <h2>Prompt token composition</h2>
+          <h2>Token composition</h2>
         </div>
-        <div className="compact-empty">Select a prompt to inspect composition.</div>
+        <div className="compact-empty">No token composition is available.</div>
       </aside>
     );
   }
 
   const nonCachedInput = Math.max(
-    prompt.inputTokens - prompt.cachedInputTokens,
+    context.usage.inputTokens - context.usage.cachedInputTokens,
     0
   );
   const donutData = [
-    { name: 'Cached input tokens', value: prompt.cachedInputTokens, color: COLORS.cached },
+    {
+      name: 'Cached input tokens',
+      value: context.usage.cachedInputTokens,
+      color: COLORS.cached
+    },
     { name: 'Non-cached input tokens', value: nonCachedInput, color: COLORS.nonCached },
-    { name: 'Output tokens', value: prompt.outputTokens, color: COLORS.output },
+    { name: 'Output tokens', value: context.usage.outputTokens, color: COLORS.output },
     {
       name: 'Reasoning output tokens',
-      value: prompt.reasoningOutputTokens,
+      value: context.usage.reasoningOutputTokens,
       color: COLORS.reasoning
     }
   ].filter((item) => item.value > 0);
+  const inputSources = context.inputSources.slice(0, 8);
 
   return (
     <aside className="panel composition-panel">
       <div className="rail-heading">
-        <h2>Prompt token composition</h2>
+        <h2>Token composition</h2>
       </div>
 
       <dl className="prompt-meta">
         <div>
-          <dt>Selected prompt</dt>
-          <dd>{formatDateTime(prompt.startedAt)}</dd>
+          <dt>{context.titleLabel}</dt>
+          <dd>{context.title}</dd>
         </div>
-        <div>
-          <dt>Session</dt>
-          <dd>{prompt.sessionId}</dd>
-        </div>
-        <div>
-          <dt>Model</dt>
-          <dd>{prompt.model || 'unknown'}</dd>
-        </div>
+        {context.details.map((detail) => (
+          <div key={detail.label}>
+            <dt>{detail.label}</dt>
+            <dd>{detail.value}</dd>
+          </div>
+        ))}
       </dl>
 
       <div className="donut-wrap">
@@ -80,7 +93,7 @@ export const PromptComposition = ({ prompt }: PromptCompositionProps) => {
           </PieChart>
         </ResponsiveContainer>
         <div className="donut-center">
-          <strong>{formatNumber(prompt.inputTokens)}</strong>
+          <strong>{formatNumber(context.usage.inputTokens)}</strong>
           <span>Total input tokens</span>
         </div>
       </div>
@@ -90,8 +103,8 @@ export const PromptComposition = ({ prompt }: PromptCompositionProps) => {
           <span className="swatch cached" />
           <span>Cached input tokens</span>
           <strong>
-            {formatNumber(prompt.cachedInputTokens)} (
-            {formatPercent(prompt.inputCacheHitRate)})
+            {formatNumber(context.usage.cachedInputTokens)} (
+            {formatPercent(context.inputCacheHitRate)})
           </strong>
         </li>
         <li>
@@ -102,18 +115,52 @@ export const PromptComposition = ({ prompt }: PromptCompositionProps) => {
         <li>
           <span className="swatch output" />
           <span>Output tokens</span>
-          <strong>{formatNumber(prompt.outputTokens)}</strong>
+          <strong>{formatNumber(context.usage.outputTokens)}</strong>
         </li>
         <li>
           <span className="swatch reasoning" />
           <span>Reasoning output tokens</span>
-          <strong>{formatNumber(prompt.reasoningOutputTokens)}</strong>
+          <strong>{formatNumber(context.usage.reasoningOutputTokens)}</strong>
         </li>
       </ul>
 
+      <section className="input-source-section">
+        <div className="section-subheading">
+          <h3>Input source attribution</h3>
+          <span>Estimated</span>
+        </div>
+        {inputSources.length > 0 ? (
+          <ul className="input-source-list">
+            {inputSources.map((source) => (
+              <li key={source.sourceId}>
+                <div className="input-source-row">
+                  <span>{source.label}</span>
+                  <strong>{formatNumber(source.estimatedTokens)}</strong>
+                </div>
+                <div className="input-source-track" aria-hidden="true">
+                  <span style={{ width: `${Math.max(source.share * 100, 2)}%` }} />
+                </div>
+                <div className="input-source-meta">
+                  <span>{formatPercent(source.share)}</span>
+                  <span>{formatNumber(source.chars)} chars</span>
+                  <span>{source.confidence}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="input-source-empty">
+            No visible context sources were captured for this prompt.
+          </div>
+        )}
+        <p className="input-source-note">
+          Estimated from visible JSONL context and normalized to real input tokens.
+        </p>
+      </section>
+
       <div className="cache-rate-summary">
         <span>Cache hit rate</span>
-        <strong>{formatPercent(prompt.inputCacheHitRate)}</strong>
+        <strong>{formatPercent(context.inputCacheHitRate)}</strong>
       </div>
     </aside>
   );

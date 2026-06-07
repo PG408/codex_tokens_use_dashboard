@@ -1,6 +1,7 @@
 import { Info } from 'lucide-react';
 import type { DashboardSession, SessionSortKey } from '../clientTypes.js';
 import { formatNumber, formatPercent } from '../formatters.js';
+import { projectNameFromCwd, sessionLabel } from '../sessionDisplay.js';
 
 type SortState = {
   key: SessionSortKey;
@@ -9,13 +10,10 @@ type SortState = {
 
 type SessionRankingProps = {
   sessions: DashboardSession[];
+  selectedSessionId: string;
   sort: SortState;
+  onSessionSelect: (sessionId: string) => void;
   onSortChange: (sort: SortState) => void;
-};
-
-const sessionLabel = (sessionId: string): string => {
-  const parts = sessionId.split('-');
-  return parts.length > 2 ? parts.slice(0, 3).join('-') : sessionId;
 };
 
 const sortOptions: Array<{ label: string; value: SessionSortKey }> = [
@@ -34,7 +32,9 @@ const sessionFooterRange = (sessionCount: number): string => {
 
 export const SessionRanking = ({
   sessions,
+  selectedSessionId,
   sort,
+  onSessionSelect,
   onSortChange
 }: SessionRankingProps) => (
   <article className="panel session-panel">
@@ -71,6 +71,7 @@ export const SessionRanking = ({
           <thead>
             <tr>
               <th>#</th>
+              <th>Project</th>
               <th>Session</th>
               <th>Total tokens</th>
               <th>Input tokens</th>
@@ -80,11 +81,24 @@ export const SessionRanking = ({
           </thead>
           <tbody>
             {sessions.slice(0, 10).map((session, index) => (
-              <tr key={session.sessionId}>
+              <tr
+                className={
+                  session.sessionId === selectedSessionId ? 'selected-row' : undefined
+                }
+                key={session.sessionId}
+                onClick={() => onSessionSelect(session.sessionId)}
+              >
                 <td>{index + 1}</td>
+                <td className="project-name-cell">{projectNameFromCwd(session.cwd)}</td>
                 <td>
-                  <strong>{sessionLabel(session.sessionId)}</strong>
-                  <span>{session.modelProvider || 'unknown model'}</span>
+                  <span className="session-id-copy">
+                    <strong className="session-id-short">
+                      {sessionLabel(session.sessionId)}
+                    </strong>
+                    <span className="session-id-tooltip" role="tooltip">
+                      {session.sessionId}
+                    </span>
+                  </span>
                 </td>
                 <td>{formatNumber(session.totalTokens)}</td>
                 <td>{formatNumber(session.inputTokens)}</td>

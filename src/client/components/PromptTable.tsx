@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { DashboardPrompt, PromptSortKey } from '../clientTypes.js';
 import { formatDateTime, formatNumber, formatPercent } from '../formatters.js';
+import { projectNameFromCwd, sessionLabel } from '../sessionDisplay.js';
 
 type SortState = {
   key: PromptSortKey;
@@ -27,6 +28,12 @@ const promptFooterRange = (promptCount: number): string => {
     return '0 of 0';
   }
   return `1-${Math.min(promptCount, 20)} of ${formatNumber(promptCount)}`;
+};
+
+const modelLabel = (prompt: DashboardPrompt): string => {
+  const model = prompt.model || 'unknown';
+
+  return prompt.modelEffort ? `${model} / ${prompt.modelEffort}` : model;
 };
 
 const SortButton = ({
@@ -86,6 +93,7 @@ export const PromptTable = ({
           <thead>
             <tr>
               <th>Time</th>
+              <th>Project</th>
               <th>Session</th>
               <th>Model</th>
               <th>Prompt summary</th>
@@ -107,10 +115,29 @@ export const PromptTable = ({
                 onClick={() => onPromptSelect(prompt.promptId)}
               >
                 <td>{formatDateTime(prompt.startedAt)}</td>
-                <td>{prompt.sessionId}</td>
-                <td>{prompt.model || 'unknown'}</td>
+                <td className="project-name-cell">{projectNameFromCwd(prompt.cwd)}</td>
+                <td className="session-id-cell">
+                  <span className="session-id-copy">
+                    <span className="session-id-short">
+                      {sessionLabel(prompt.sessionId)}
+                    </span>
+                    <span className="session-id-tooltip" role="tooltip">
+                      {prompt.sessionId}
+                    </span>
+                  </span>
+                </td>
+                <td className="model-cell" title={modelLabel(prompt)}>
+                  {modelLabel(prompt)}
+                </td>
                 <td className="prompt-preview">
-                  <div className="prompt-preview-text">{prompt.promptPreview}</div>
+                  <span className="prompt-preview-copy">
+                    <span className="prompt-preview-text">
+                      {prompt.promptPreview}
+                    </span>
+                    <span className="prompt-preview-tooltip" role="tooltip">
+                      {prompt.promptPreview}
+                    </span>
+                  </span>
                 </td>
                 <td>{formatNumber(prompt.totalTokens)}</td>
                 <td>{formatNumber(prompt.inputTokens)}</td>

@@ -16,6 +16,7 @@ import type { DashboardData } from '../shared/types.js';
 import type {
   DateRange,
   DashboardSession,
+  DashboardPrompt,
   PromptSortKey,
   SessionSortKey,
   SortDirection,
@@ -23,11 +24,16 @@ import type {
   TimeRange
 } from './clientTypes.js';
 import { KpiStrip } from './components/KpiStrip.js';
-import { PromptComposition } from './components/PromptComposition.js';
+import {
+  PromptComposition,
+  type TokenCompositionContext
+} from './components/PromptComposition.js';
 import { PromptTable } from './components/PromptTable.js';
 import { SessionRanking } from './components/SessionRanking.js';
 import { Toolbar } from './components/Toolbar.js';
 import { UsageCharts } from './components/UsageCharts.js';
+import { formatDateTime, formatNumber } from './formatters.js';
+import { projectNameFromCwd } from './sessionDisplay.js';
 
 const emptyDashboard: DashboardData = {
   refreshedAt: '',
@@ -165,6 +171,66 @@ const sessionOptionsFromDashboard = (
     label: session.sessionId
   }));
 
+const tokenUsageFrom = ({
+  inputTokens,
+  cachedInputTokens,
+  outputTokens,
+  reasoningOutputTokens,
+  totalTokens
+}: {
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+  totalTokens: number;
+}) => ({
+  inputTokens,
+  cachedInputTokens,
+  outputTokens,
+  reasoningOutputTokens,
+  totalTokens
+});
+
+const modelLabel = (prompt: DashboardPrompt): string => {
+  const model = prompt.model || 'unknown';
+  return prompt.modelEffort ? `${model} / ${prompt.modelEffort}` : model;
+};
+
+const aggregateInputSources = (
+  prompts: DashboardPrompt[],
+  inputTokens: number
+): DashboardPrompt['inputSources'] => {
+  const sources = new Map<string, DashboardPrompt['inputSources'][number]>();
+
+  prompts.forEach((prompt) => {
+    prompt.inputSources.forEach((source) => {
+      const existing = sources.get(source.sourceId);
+      sources.set(source.sourceId, {
+        ...source,
+        chars: (existing?.chars ?? 0) + source.chars,
+        events: (existing?.events ?? 0) + source.events,
+        estimatedTokens:
+          (existing?.estimatedTokens ?? 0) + source.estimatedTokens,
+        share: 0
+      });
+    });
+  });
+
+  const totalEstimatedTokens = [...sources.values()].reduce(
+    (sum, source) => sum + source.estimatedTokens,
+    0
+  );
+  const shareDenominator = inputTokens > 0 ? inputTokens : totalEstimatedTokens;
+
+  return [...sources.values()]
+    .map((source) => ({
+      ...source,
+      share:
+        shareDenominator > 0 ? source.estimatedTokens / shareDenominator : 0
+    }))
+    .sort((left, right) => right.estimatedTokens - left.estimatedTokens);
+};
+
 export const App = () => {
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [sessionOptions, setSessionOptions] = useState<
@@ -175,6 +241,7 @@ export const App = () => {
   const [sessionId, setSessionId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPromptId, setSelectedPromptId] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [promptSort, setPromptSort] = useState<SortState<PromptSortKey>>({
     key: 'totalTokens',
     direction: 'desc'
@@ -240,7 +307,13 @@ export const App = () => {
           if (nextDashboard.prompts.some((prompt) => prompt.promptId === current)) {
             return current;
           }
-          return nextDashboard.prompts[0]?.promptId ?? '';
+          return '';
+        });
+        setSelectedSessionId((current) => {
+          if (nextDashboard.sessions.some((session) => session.sessionId === current)) {
+            return current;
+          }
+          return '';
         });
       } catch (requestError) {
         if (
@@ -284,6 +357,8 @@ export const App = () => {
   );
 
   useEffect(() => {
+    setSelectedPromptId('');
+    setSelectedSessionId('');
     if (!hasStartedBootstrap.current) {
       hasStartedBootstrap.current = true;
       void loadDashboard('refresh');
@@ -313,9 +388,65 @@ export const App = () => {
   );
 
   const selectedPrompt =
-    sortedPrompts.find((prompt) => prompt.promptId === selectedPromptId) ??
-    sortedPrompts[0] ??
+    sortedPrompts.find((prompt) => prompt.promptId === selectedPromptId) ?? null;
+  const selectedSession =
+    sortedSessions.find((session) => session.sessionId === selectedSessionId) ??
     null;
+  const compositionContext = useMemo<TokenCompositionContext | null>(() => {
+    if (selectedPrompt) {
+      return {
+        kind: 'prompt',
+        titleLabel: 'Selected prompt',
+        title: formatDateTime(selectedPrompt.startedAt),
+        details: [
+          { label: 'Session', value: selectedPrompt.sessionId },
+          { label: 'Model', value: modelLabel(selectedPrompt) },
+          ...(selectedPrompt.modelContextWindow > 0
+            ? [
+                {
+                  label: 'Context window',
+                  value: formatNumber(selectedPrompt.modelContextWindow)
+                }
+              ]
+            : [])
+        ],
+        usage: tokenUsageFrom(selectedPrompt),
+        inputCacheHitRate: selectedPrompt.inputCacheHitRate,
+        inputSources: selectedPrompt.inputSources
+      };
+    }
+
+    if (selectedSession) {
+      const sessionPrompts = dashboard.prompts.filter(
+        (prompt) => prompt.sessionId === selectedSession.sessionId
+      );
+      return {
+        kind: 'session',
+        titleLabel: 'Selected session',
+        title: selectedSession.sessionId,
+        details: [
+          { label: 'Project', value: projectNameFromCwd(selectedSession.cwd) },
+          { label: 'Prompts', value: formatNumber(sessionPrompts.length) }
+        ],
+        usage: tokenUsageFrom(selectedSession),
+        inputCacheHitRate: selectedSession.inputCacheHitRate,
+        inputSources: aggregateInputSources(sessionPrompts, selectedSession.inputTokens)
+      };
+    }
+
+    return {
+      kind: 'summary',
+      titleLabel: 'Scope',
+      title: 'Current filter summary',
+      details: [
+        { label: 'Sessions', value: formatNumber(dashboard.kpis.sessionCount) },
+        { label: 'Prompts', value: formatNumber(dashboard.kpis.promptCount) }
+      ],
+      usage: tokenUsageFrom(dashboard.kpis),
+      inputCacheHitRate: dashboard.kpis.inputCacheHitRate,
+      inputSources: aggregateInputSources(dashboard.prompts, dashboard.kpis.inputTokens)
+    };
+  }, [dashboard, selectedPrompt, selectedSession]);
   const hasDashboardData =
     dashboard.trend.length > 0 ||
     dashboard.sessions.length > 0 ||
@@ -328,6 +459,18 @@ export const App = () => {
       direction:
         current.key === key && current.direction === 'desc' ? 'asc' : 'desc'
     }));
+  };
+
+  const selectPrompt = (promptId: string) => {
+    setSelectedSessionId('');
+    setSelectedPromptId((current) => (current === promptId ? '' : promptId));
+  };
+
+  const selectSession = (nextSessionId: string) => {
+    setSelectedPromptId('');
+    setSelectedSessionId((current) =>
+      current === nextSessionId ? '' : nextSessionId
+    );
   };
 
   return (
@@ -427,17 +570,19 @@ export const App = () => {
             <section className="lower-grid">
               <SessionRanking
                 sessions={sortedSessions}
+                selectedSessionId={selectedSessionId}
                 sort={sessionSort}
+                onSessionSelect={selectSession}
                 onSortChange={setSessionSort}
               />
               <PromptTable
                 prompts={sortedPrompts}
                 selectedPromptId={selectedPrompt?.promptId ?? ''}
                 sort={promptSort}
-                onPromptSelect={setSelectedPromptId}
+                onPromptSelect={selectPrompt}
                 onSortChange={changePromptSort}
               />
-              <PromptComposition prompt={selectedPrompt} />
+              <PromptComposition context={compositionContext} />
             </section>
           </>
         )}

@@ -1,7 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { DashboardPrompt, DashboardSession } from '../clientTypes.js';
-import { PromptComposition } from '../components/PromptComposition.js';
+import {
+  PromptComposition,
+  type TokenCompositionContext
+} from '../components/PromptComposition.js';
 import { PromptTable } from '../components/PromptTable.js';
 import { SessionRanking } from '../components/SessionRanking.js';
 import { Toolbar } from '../components/Toolbar.js';
@@ -12,13 +15,38 @@ const prompt = (id: string, sessionId = 'session-alpha'): DashboardPrompt => ({
   startedAt: '2026-06-07T01:00:00.000Z',
   promptPreview: 'Inspect dashboard controls',
   callCount: 1,
+  cwd: '/tmp/project-alpha',
   inputTokens: 100,
   cachedInputTokens: 25,
   outputTokens: 50,
   reasoningOutputTokens: 10,
   totalTokens: 150,
   inputCacheHitRate: 0.25,
-  model: 'gpt-5'
+  model: 'gpt-5.5',
+  modelEffort: 'high',
+  modelContextWindow: 258400,
+  inputSources: [
+    {
+      sourceId: 'user_prompt:User prompt',
+      category: 'user_prompt',
+      label: 'User prompt',
+      chars: 120,
+      events: 1,
+      confidence: 'high',
+      estimatedTokens: 70,
+      share: 0.7
+    },
+    {
+      sourceId: 'tool_outputs:Tool output: exec_command',
+      category: 'tool_outputs',
+      label: 'Tool output: exec_command',
+      chars: 50,
+      events: 1,
+      confidence: 'high',
+      estimatedTokens: 30,
+      share: 0.3
+    }
+  ]
 });
 
 const session = (id: string): DashboardSession => ({
@@ -38,8 +66,31 @@ const session = (id: string): DashboardSession => ({
   inputCacheHitRate: 0.25
 });
 
+const promptCompositionContext = (): TokenCompositionContext => {
+  const selectedPrompt = prompt('prompt-1');
+  return {
+    kind: 'prompt',
+    titleLabel: 'Selected prompt',
+    title: 'Jun 7, 1:00 AM',
+    details: [
+      { label: 'Session', value: selectedPrompt.sessionId },
+      { label: 'Model', value: 'gpt-5.5 / high' },
+      { label: 'Context window', value: '258.4K' }
+    ],
+    usage: {
+      inputTokens: selectedPrompt.inputTokens,
+      cachedInputTokens: selectedPrompt.cachedInputTokens,
+      outputTokens: selectedPrompt.outputTokens,
+      reasoningOutputTokens: selectedPrompt.reasoningOutputTokens,
+      totalTokens: selectedPrompt.totalTokens
+    },
+    inputCacheHitRate: selectedPrompt.inputCacheHitRate,
+    inputSources: selectedPrompt.inputSources
+  };
+};
+
 describe('dashboard components', () => {
-  it('renders prompt session ids as non-clickable text', () => {
+  it('renders project names and copyable detail tooltips in prompt rows', () => {
     const html = renderToStaticMarkup(
       <PromptTable
         prompts={[prompt('prompt-1')]}
@@ -50,9 +101,29 @@ describe('dashboard components', () => {
       />
     );
 
+    expect(html).toContain('project-alpha');
+    expect(html).toContain('gpt-5.5 / high');
     expect(html).toContain('session-alpha');
+    expect(html).toContain('session-id-tooltip');
     expect(html).toContain('prompt-preview-text');
+    expect(html).toContain('prompt-preview-tooltip');
     expect(html).not.toContain('link-button');
+  });
+
+  it('renders project names and full session id tooltips in session ranking rows', () => {
+    const html = renderToStaticMarkup(
+      <SessionRanking
+        sessions={[session('session-alpha-long-id')]}
+        selectedSessionId="session-alpha-long-id"
+        sort={{ key: 'totalTokens', direction: 'desc' }}
+        onSessionSelect={() => undefined}
+        onSortChange={() => undefined}
+      />
+    );
+
+    expect(html).toContain('project');
+    expect(html).toContain('session-alpha-long-id');
+    expect(html).toContain('session-id-tooltip');
   });
 
   it('renders accurate prompt table footer ranges', () => {
@@ -79,7 +150,9 @@ describe('dashboard components', () => {
       renderToStaticMarkup(
         <SessionRanking
           sessions={sessions}
+          selectedSessionId=""
           sort={{ key: 'totalTokens', direction: 'desc' }}
+          onSessionSelect={() => undefined}
           onSortChange={() => undefined}
         />
       );
@@ -92,9 +165,23 @@ describe('dashboard components', () => {
   });
 
   it('does not render an inert close icon in the composition rail', () => {
-    const html = renderToStaticMarkup(<PromptComposition prompt={null} />);
+    const html = renderToStaticMarkup(<PromptComposition context={null} />);
 
     expect(html).not.toContain('lucide-x');
+  });
+
+  it('renders model effort and context window in the composition rail', () => {
+    const html = renderToStaticMarkup(
+      <PromptComposition context={promptCompositionContext()} />
+    );
+
+    expect(html).toContain('gpt-5.5 / high');
+    expect(html).toContain('Context window');
+    expect(html).toContain('258.4K');
+    expect(html).toContain('Input source attribution');
+    expect(html).toContain('User prompt');
+    expect(html).toContain('Tool output: exec_command');
+    expect(html).toContain('Estimated from visible JSONL context');
   });
 
   it('renders quick ranges and custom date inputs in the toolbar', () => {

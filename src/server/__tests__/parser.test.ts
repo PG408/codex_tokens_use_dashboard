@@ -27,6 +27,26 @@ const userMessage = (timestamp: string, text: string): string =>
     }
   });
 
+const turnContext = (
+  timestamp: string,
+  model = 'gpt-5.5',
+  effort = 'high'
+): string =>
+  JSON.stringify({
+    timestamp,
+    type: 'turn_context',
+    payload: {
+      model,
+      effort,
+      collaboration_mode: {
+        settings: {
+          model,
+          reasoning_effort: effort
+        }
+      }
+    }
+  });
+
 const tokenCount = (
   timestamp: string,
   lastTotalTokens: number,
@@ -34,7 +54,8 @@ const tokenCount = (
   inputTokens = lastTotalTokens,
   cachedInputTokens = 0,
   outputTokens = 0,
-  reasoningOutputTokens = 0
+  reasoningOutputTokens = 0,
+  modelContextWindow = 258400
 ): string =>
   JSON.stringify({
     timestamp,
@@ -55,8 +76,41 @@ const tokenCount = (
           output_tokens: outputTokens,
           reasoning_output_tokens: reasoningOutputTokens,
           total_tokens: totalTokens
-        }
+        },
+        model_context_window: modelContextWindow
       }
+    }
+  });
+
+const functionCall = (
+  timestamp: string,
+  callId: string,
+  name: string,
+  args: string
+): string =>
+  JSON.stringify({
+    timestamp,
+    type: 'response_item',
+    payload: {
+      type: 'function_call',
+      call_id: callId,
+      name,
+      arguments: args
+    }
+  });
+
+const functionCallOutput = (
+  timestamp: string,
+  callId: string,
+  output: string
+): string =>
+  JSON.stringify({
+    timestamp,
+    type: 'response_item',
+    payload: {
+      type: 'function_call_output',
+      call_id: callId,
+      output
     }
   });
 
@@ -64,9 +118,11 @@ describe('parseSessionJsonl', () => {
   it('groups multiple token calls under one Prompt until the next user input', () => {
     const jsonl = [
       sessionMeta,
+      turnContext('2026-06-07T01:00:00.500Z', 'gpt-5.5', 'high'),
       userMessage('2026-06-07T01:00:01.000Z', 'Build the dashboard MVP'),
       tokenCount('2026-06-07T01:00:02.000Z', 120, 120, 100, 40, 20, 5),
       tokenCount('2026-06-07T01:00:03.000Z', 80, 200, 50, 10, 30, 0),
+      turnContext('2026-06-07T01:00:03.500Z', 'gpt-5.1-codex-max', 'xhigh'),
       userMessage('2026-06-07T01:00:04.000Z', 'Filter by session'),
       tokenCount('2026-06-07T01:00:05.000Z', 35, 235, 25, 5, 10, 1)
     ].join('\n');
@@ -89,15 +145,35 @@ describe('parseSessionJsonl', () => {
       startedAt: '2026-06-07T01:00:01.000Z',
       promptPreview: 'Build the dashboard MVP',
       callCount: 2,
+      model: 'gpt-5.5',
+      modelEffort: 'high',
+      modelContextWindow: 258400,
       inputTokens: 150,
       cachedInputTokens: 50,
       outputTokens: 50,
       reasoningOutputTokens: 5,
       totalTokens: 200
     });
+    expect(parsed.prompts[0].inputSources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceId: 'user_prompt:User prompt',
+          category: 'user_prompt',
+          chars: 'Build the dashboard MVP'.length,
+          confidence: 'high'
+        }),
+        expect.objectContaining({
+          sourceId: 'runtime_metadata:Runtime metadata',
+          category: 'runtime_metadata',
+          confidence: 'low'
+        })
+      ])
+    );
     expect(parsed.prompts[1]).toMatchObject({
       promptPreview: 'Filter by session',
       callCount: 1,
+      model: 'gpt-5.1-codex-max',
+      modelEffort: 'xhigh',
       totalTokens: 35
     });
     expect(parsed.tokenCalls).toHaveLength(3);
@@ -110,6 +186,57 @@ describe('parseSessionJsonl', () => {
       totalTokenDelta: 235,
       lastReportedTotalTokens: 235
     });
+  });
+
+  it('breaks tool input context down by tool name', () => {
+    const jsonl = [
+      sessionMeta,
+      userMessage('2026-06-07T01:00:01.000Z', 'Inspect tool output mix'),
+      functionCall(
+        '2026-06-07T01:00:02.000Z',
+        'call-shell',
+        'exec_command',
+        '{"cmd":"ls"}'
+      ),
+      functionCallOutput(
+        '2026-06-07T01:00:03.000Z',
+        'call-shell',
+        'shell output'
+      ),
+      functionCall(
+        '2026-06-07T01:00:04.000Z',
+        'call-web',
+        'web.run',
+        '{"open":[]}'
+      ),
+      functionCallOutput(
+        '2026-06-07T01:00:05.000Z',
+        'call-web',
+        'web output'
+      )
+    ].join('\n');
+
+    const parsed = parseSessionJsonl(jsonl, sourceFile);
+
+    expect(parsed.prompts[0].inputSources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceId: 'tool_calls:Tool call: exec_command',
+          label: 'Tool call: exec_command',
+          chars: '{"cmd":"ls"}'.length
+        }),
+        expect.objectContaining({
+          sourceId: 'tool_outputs:Tool output: exec_command',
+          label: 'Tool output: exec_command',
+          chars: 'shell output'.length
+        }),
+        expect.objectContaining({
+          sourceId: 'tool_outputs:Tool output: web.run',
+          label: 'Tool output: web.run',
+          chars: 'web output'.length
+        })
+      ])
+    );
   });
 
   it('normalizes and truncates Prompt previews without storing full input text', () => {

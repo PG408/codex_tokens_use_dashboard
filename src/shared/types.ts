@@ -6,6 +6,36 @@ export type TokenUsage = {
   totalTokens: number;
 };
 
+export type ModelMetadata = {
+  model: string;
+  modelEffort: string;
+  modelContextWindow: number;
+};
+
+export type InputSourceCategory =
+  | 'user_prompt'
+  | 'system_developer'
+  | 'instructions_skills'
+  | 'conversation_history'
+  | 'tool_calls'
+  | 'tool_outputs'
+  | 'compacted_history'
+  | 'runtime_metadata';
+
+export type InputSourceRecord = {
+  sourceId: string;
+  category: InputSourceCategory;
+  label: string;
+  chars: number;
+  events: number;
+  confidence: 'high' | 'medium' | 'low';
+};
+
+export type InputSourceEstimate = InputSourceRecord & {
+  estimatedTokens: number;
+  share: number;
+};
+
 export type SessionRecord = {
   sessionId: string;
   sourceFile: string;
@@ -17,15 +47,18 @@ export type SessionRecord = {
   lastSeenAt: string;
 };
 
-export type PromptRecord = TokenUsage & {
+export type PromptRecord = TokenUsage &
+  ModelMetadata & {
   promptId: string;
   sessionId: string;
   startedAt: string;
   promptPreview: string;
   callCount: number;
+  inputSources: InputSourceRecord[];
 };
 
-export type TokenCallRecord = TokenUsage & {
+export type TokenCallRecord = TokenUsage &
+  ModelMetadata & {
   callId: string;
   sessionId: string;
   promptId: string;
@@ -62,9 +95,10 @@ export type DashboardData = {
       }
   >;
   prompts: Array<
-    PromptRecord & {
+    Omit<PromptRecord, 'inputSources'> & {
+      cwd: string;
+      inputSources: InputSourceEstimate[];
       inputCacheHitRate: number | null;
-      model: string;
     }
   >;
 };

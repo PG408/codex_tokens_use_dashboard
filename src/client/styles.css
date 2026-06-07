@@ -665,26 +665,99 @@ button {
   text-align: center;
 }
 
+.project-name-cell {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-table td .session-id-copy,
+.data-table td .prompt-preview-copy {
+  margin-top: 0;
+}
+
+.session-id-cell,
+.compact-table th:nth-child(3),
+.compact-table td:nth-child(3) {
+  width: 116px;
+  max-width: 116px;
+}
+
+.data-table td .session-id-copy {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  user-select: text;
+}
+
+.data-table td .session-id-short {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.data-table td .session-id-tooltip {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: none;
+  max-width: 460px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 0;
+  padding: 7px 9px;
+  background: var(--background);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  user-select: text;
+}
+
+.data-table td .session-id-copy:hover .session-id-tooltip,
+.data-table td .session-id-copy:focus-within .session-id-tooltip {
+  display: block;
+}
+
 .prompt-table {
-  min-width: 1040px;
+  min-width: 1190px;
 }
 
 .prompt-table th:nth-child(2),
 .prompt-table td:nth-child(2) {
-  width: 190px;
-  max-width: 190px;
+  width: 150px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .prompt-table th:nth-child(3),
 .prompt-table td:nth-child(3) {
-  width: 82px;
+  width: 116px;
+  max-width: 116px;
+  overflow: visible;
+}
+
+.prompt-table th:nth-child(4),
+.prompt-table td:nth-child(4) {
+  width: 136px;
+  max-width: 136px;
+}
+
+.model-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prompt-table tbody tr,
 .compact-table tbody tr {
-  cursor: default;
+  cursor: pointer;
 }
 
 .prompt-table tbody tr:hover,
@@ -696,19 +769,53 @@ button {
   width: 300px;
   min-width: 260px;
   max-width: 360px;
-  overflow: hidden;
+  overflow: visible;
 }
 
-.prompt-preview-text {
-  display: -webkit-box;
+.data-table td .prompt-preview-copy {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  user-select: text;
+}
+
+.data-table td .prompt-preview-text {
+  display: block;
   max-width: 100%;
   overflow: hidden;
   overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   line-height: 1.35;
-  white-space: normal;
-  word-break: break-word;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.data-table td .prompt-preview-tooltip {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  display: none;
+  width: min(560px, 70vw);
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 0;
+  padding: 9px 10px;
+  background: var(--background);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.data-table td .prompt-preview-copy:hover .prompt-preview-tooltip,
+.data-table td .prompt-preview-copy:focus-within .prompt-preview-tooltip {
+  display: block;
 }
 
 .rate-good {
@@ -797,6 +904,88 @@ button {
 .composition-list strong {
   grid-column: 2;
   color: var(--text);
+}
+
+.input-source-section {
+  display: grid;
+  gap: 10px;
+  margin: 18px 16px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.section-subheading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.section-subheading h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.section-subheading span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.input-source-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.input-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.input-source-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.input-source-row strong {
+  flex: 0 0 auto;
+}
+
+.input-source-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.input-source-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--teal);
+}
+
+.input-source-meta {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.input-source-empty,
+.input-source-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .swatch {

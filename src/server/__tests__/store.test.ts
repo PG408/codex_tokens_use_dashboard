@@ -24,6 +24,27 @@ const parsedSession = (
       startedAt: '2026-06-07T00:05:00.000Z',
       promptPreview,
       callCount: 2,
+      model: 'gpt-5.5',
+      modelEffort: 'high',
+      modelContextWindow: 258400,
+      inputSources: [
+        {
+          sourceId: 'user_prompt:User prompt',
+          category: 'user_prompt',
+          label: 'User prompt',
+          chars: 120,
+          events: 1,
+          confidence: 'high'
+        },
+        {
+          sourceId: 'tool_outputs:Tool output: exec_command',
+          category: 'tool_outputs',
+          label: 'Tool output: exec_command',
+          chars: 80,
+          events: 1,
+          confidence: 'high'
+        }
+      ],
       inputTokens: totalTokens === 300 ? 120 : 0,
       cachedInputTokens: totalTokens === 300 ? 60 : 0,
       outputTokens: totalTokens === 300 ? 90 : 40,
@@ -36,6 +57,10 @@ const parsedSession = (
       startedAt: '2026-06-07T00:01:00.000Z',
       promptPreview: 'unattributed',
       callCount: 1,
+      model: 'gpt-5.5',
+      modelEffort: 'high',
+      modelContextWindow: 258400,
+      inputSources: [],
       inputTokens: 20,
       cachedInputTokens: 5,
       outputTokens: 5,
@@ -49,6 +74,9 @@ const parsedSession = (
       sessionId,
       promptId: `${sessionId}:prompt-1`,
       occurredAt: '2026-06-07T00:06:00.000Z',
+      model: 'gpt-5.5',
+      modelEffort: 'high',
+      modelContextWindow: 258400,
       inputTokens: totalTokens === 300 ? 80 : 0,
       cachedInputTokens: totalTokens === 300 ? 40 : 0,
       outputTokens: totalTokens === 300 ? 60 : 40,
@@ -60,6 +88,9 @@ const parsedSession = (
       sessionId,
       promptId: `${sessionId}:prompt-1`,
       occurredAt: '2026-06-08T00:06:00.000Z',
+      model: 'gpt-5.5',
+      modelEffort: 'high',
+      modelContextWindow: 258400,
       inputTokens: totalTokens === 300 ? 40 : 0,
       cachedInputTokens: totalTokens === 300 ? 20 : 0,
       outputTokens: totalTokens === 300 ? 30 : 0,
@@ -71,6 +102,9 @@ const parsedSession = (
       sessionId,
       promptId: `${sessionId}:unattributed`,
       occurredAt: '2026-06-07T00:02:00.000Z',
+      model: 'gpt-5.5',
+      modelEffort: 'high',
+      modelContextWindow: 258400,
       inputTokens: 20,
       cachedInputTokens: 5,
       outputTokens: 5,
@@ -136,10 +170,28 @@ describe('dashboard store', () => {
       'session-b dashboard analysis'
     ]);
     expect(dashboard.prompts[0]).toMatchObject({
+      cwd: '/tmp/session-a',
       totalTokens: 300,
       inputCacheHitRate: 0.5,
-      model: 'openai'
+      model: 'gpt-5.5',
+      modelEffort: 'high',
+      modelContextWindow: 258400
     });
+    expect(dashboard.prompts[0].inputSources).toEqual([
+      expect.objectContaining({
+        sourceId: 'user_prompt:User prompt',
+        category: 'user_prompt',
+        estimatedTokens: 72,
+        share: 0.6
+      }),
+      expect.objectContaining({
+        sourceId: 'tool_outputs:Tool output: exec_command',
+        category: 'tool_outputs',
+        label: 'Tool output: exec_command',
+        estimatedTokens: 48,
+        share: 0.4
+      })
+    ]);
   });
 
   it('keeps the last parsed result when the same source file repeats', async () => {

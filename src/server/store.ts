@@ -4,6 +4,8 @@ import initSqlJs from 'sql.js';
 import type { Database, ParamsObject, SqlValue, Statement } from 'sql.js';
 import type {
   DashboardData,
+  InputSourceEstimate,
+  InputSourceRecord,
   ParsedSession,
   PromptRecord,
   SessionRecord,
@@ -62,6 +64,44 @@ const usageFromRow = (row: SqlRow): TokenUsage => ({
   totalTokens: numberValue(row.totalTokens)
 });
 
+const parseInputSources = (value: SqlValue): InputSourceRecord[] => {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return [];
+  }
+
+  const parsed = JSON.parse(value) as InputSourceRecord[];
+  return Array.isArray(parsed)
+    ? parsed.map((source) => ({
+        ...source,
+        sourceId:
+          source.sourceId ?? `${source.category}:${source.label ?? source.category}`
+      }))
+    : [];
+};
+
+const estimateInputSources = (
+  inputSources: InputSourceRecord[],
+  inputTokens: number
+): InputSourceEstimate[] => {
+  const totalChars = inputSources.reduce((sum, source) => sum + source.chars, 0);
+
+  if (totalChars === 0) {
+    return [];
+  }
+
+  return inputSources
+    .map((source) => {
+      const share = source.chars / totalChars;
+      return {
+        ...source,
+        estimatedTokens:
+          inputTokens > 0 ? Math.round(inputTokens * share) : Math.round(source.chars / 4),
+        share
+      };
+    })
+    .sort((left, right) => right.estimatedTokens - left.estimatedTokens);
+};
+
 const createSchema = (db: Database): void => {
   db.run(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -81,6 +121,10 @@ const createSchema = (db: Database): void => {
       started_at TEXT NOT NULL,
       prompt_preview TEXT NOT NULL,
       call_count INTEGER NOT NULL,
+      model TEXT NOT NULL,
+      model_effort TEXT NOT NULL,
+      model_context_window INTEGER NOT NULL,
+      input_sources_json TEXT NOT NULL,
       input_tokens INTEGER NOT NULL,
       cached_input_tokens INTEGER NOT NULL,
       output_tokens INTEGER NOT NULL,
@@ -93,6 +137,9 @@ const createSchema = (db: Database): void => {
       session_id TEXT NOT NULL,
       prompt_id TEXT NOT NULL,
       occurred_at TEXT NOT NULL,
+      model TEXT NOT NULL,
+      model_effort TEXT NOT NULL,
+      model_context_window INTEGER NOT NULL,
       input_tokens INTEGER NOT NULL,
       cached_input_tokens INTEGER NOT NULL,
       output_tokens INTEGER NOT NULL,
@@ -195,6 +242,10 @@ const insertPrompt = (statement: Statement, prompt: PromptRecord): void => {
     prompt.startedAt,
     prompt.promptPreview,
     prompt.callCount,
+    prompt.model,
+    prompt.modelEffort,
+    prompt.modelContextWindow,
+    JSON.stringify(prompt.inputSources),
     prompt.inputTokens,
     prompt.cachedInputTokens,
     prompt.outputTokens,
@@ -212,6 +263,9 @@ const insertTokenCall = (
     tokenCall.sessionId,
     tokenCall.promptId,
     tokenCall.occurredAt,
+    tokenCall.model,
+    tokenCall.modelEffort,
+    tokenCall.modelContextWindow,
     tokenCall.inputTokens,
     tokenCall.cachedInputTokens,
     tokenCall.outputTokens,
@@ -375,12 +429,16 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           started_at,
           prompt_preview,
           call_count,
+          model,
+          model_effort,
+          model_context_window,
+          input_sources_json,
           input_tokens,
           cached_input_tokens,
           output_tokens,
           reasoning_output_tokens,
           total_tokens
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         sessionSnapshots.flatMap((parsed) => parsed.prompts),
         insertPrompt
       );
@@ -391,12 +449,15 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           session_id,
           prompt_id,
           occurred_at,
+          model,
+          model_effort,
+          model_context_window,
           input_tokens,
           cached_input_tokens,
           output_tokens,
           reasoning_output_tokens,
           total_tokens
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         sessionSnapshots.flatMap((parsed) => parsed.tokenCalls),
         insertTokenCall
       );
@@ -503,7 +564,11 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           p.started_at AS startedAt,
           p.prompt_preview AS promptPreview,
           COUNT(tc.call_id) AS callCount,
-          s.model_provider AS model,
+          s.cwd,
+          COALESCE(NULLIF(p.model, ''), s.model_provider) AS model,
+          p.model_effort AS modelEffort,
+          MAX(tc.model_context_window) AS modelContextWindow,
+          p.input_sources_json AS inputSourcesJson,
           ${usageSelect}
         FROM token_calls tc
         JOIN prompts p ON p.prompt_id = tc.prompt_id
@@ -516,18 +581,23 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
       params
     ).map((row) => {
       const usage = usageFromRow(row);
+      const inputSources = parseInputSources(row.inputSourcesJson);
       return {
         promptId: stringValue(row.promptId),
         sessionId: stringValue(row.sessionId),
         startedAt: stringValue(row.startedAt),
         promptPreview: stringValue(row.promptPreview),
         callCount: numberValue(row.callCount),
+        cwd: stringValue(row.cwd),
+        model: stringValue(row.model),
+        modelEffort: stringValue(row.modelEffort),
+        modelContextWindow: numberValue(row.modelContextWindow),
+        inputSources: estimateInputSources(inputSources, usage.inputTokens),
         ...usage,
         inputCacheHitRate: cacheRate(
           usage.cachedInputTokens,
           usage.inputTokens
-        ),
-        model: stringValue(row.model)
+        )
       };
     });
 
