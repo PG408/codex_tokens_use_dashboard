@@ -8,7 +8,7 @@ import {
   YAxis
 } from 'recharts';
 import type { DashboardData } from '../../shared/types.js';
-import { formatCompactDate, formatNumber, formatPercent } from '../App.js';
+import { formatCompactDate, formatNumber, formatPercent } from '../formatters.js';
 
 type UsageChartsProps = {
   trend: DashboardData['trend'];

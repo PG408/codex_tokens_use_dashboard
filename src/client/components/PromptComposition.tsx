@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import type { DashboardPrompt } from '../App.js';
-import { formatDateTime, formatNumber, formatPercent } from '../App.js';
+import type { DashboardPrompt } from '../clientTypes.js';
+import { formatDateTime, formatNumber, formatPercent } from '../formatters.js';
 
 type PromptCompositionProps = {
   prompt: DashboardPrompt | null;

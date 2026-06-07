@@ -13,32 +13,20 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardData } from '../shared/types.js';
+import type {
+  DashboardSession,
+  PromptSortKey,
+  SessionSortKey,
+  SortDirection,
+  SortState,
+  TimeRange
+} from './clientTypes.js';
 import { KpiStrip } from './components/KpiStrip.js';
 import { PromptComposition } from './components/PromptComposition.js';
 import { PromptTable } from './components/PromptTable.js';
 import { SessionRanking } from './components/SessionRanking.js';
 import { Toolbar } from './components/Toolbar.js';
 import { UsageCharts } from './components/UsageCharts.js';
-
-export type DashboardPrompt = DashboardData['prompts'][number];
-export type DashboardSession = DashboardData['sessions'][number];
-export type PromptSortKey =
-  | 'totalTokens'
-  | 'inputTokens'
-  | 'outputTokens'
-  | 'inputCacheHitRate';
-export type SessionSortKey =
-  | 'totalTokens'
-  | 'inputTokens'
-  | 'outputTokens'
-  | 'inputCacheHitRate';
-type SortDirection = 'asc' | 'desc';
-type TimeRange = 'all' | '7d' | '30d';
-
-type SortState<T extends string> = {
-  key: T;
-  direction: SortDirection;
-};
 
 const emptyDashboard: DashboardData = {
   refreshedAt: '',
@@ -58,7 +46,7 @@ const emptyDashboard: DashboardData = {
 };
 
 const navItems = [
-  { label: 'Overview', icon: Home, active: true },
+  { label: 'Overview', icon: Home },
   { label: 'Sessions', icon: ClipboardList },
   { label: 'Prompts', icon: FileText },
   { label: 'Models', icon: Braces },
@@ -134,43 +122,19 @@ const sortRows = <T extends Record<string, unknown>>(
   });
 };
 
-export const formatNumber = (value: number): string => {
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 1 : 2)}M`;
-  }
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(value >= 10_000 ? 1 : 2)}K`;
-  }
-  return new Intl.NumberFormat().format(value);
-};
-
-export const formatPercent = (value: number | null): string =>
-  value === null ? '-' : `${(value * 100).toFixed(1)}%`;
-
-export const formatDateTime = (value: string): string => {
-  if (!value) {
-    return '-';
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  }).format(new Date(value));
-};
-
-export const formatCompactDate = (value: string): string => {
-  if (!value) {
-    return '-';
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric'
-  }).format(new Date(value));
-};
+const sessionOptionsFromDashboard = (
+  sessions: DashboardSession[]
+): Array<{ value: string; label: string }> =>
+  sessions.map((session) => ({
+    value: session.sessionId,
+    label: session.sessionId
+  }));
 
 export const App = () => {
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
+  const [sessionOptions, setSessionOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
   const [sessionId, setSessionId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -188,29 +152,51 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const hasStartedBootstrap = useRef(false);
   const hasCompletedBootstrap = useRef(false);
+  const latestRequestId = useRef(0);
+  const activeRefreshRequestId = useRef(0);
+  const activeAbortController = useRef<AbortController | null>(null);
 
   const query = useMemo(
     () => dashboardQuery(timeRange, sessionId, searchTerm),
     [timeRange, sessionId, searchTerm]
   );
+  const isUnfilteredQuery =
+    timeRange === 'all' && sessionId === '' && searchTerm.trim() === '';
 
   const loadDashboard = useCallback(
     async (mode: 'get' | 'refresh') => {
       const isRefresh = mode === 'refresh';
+      const requestId = latestRequestId.current + 1;
+      const abortController = new AbortController();
+      latestRequestId.current = requestId;
+      activeAbortController.current?.abort();
+      activeAbortController.current = abortController;
+
       setError(null);
-      setIsLoading((current) => current || mode === 'refresh');
-      setIsRefreshing(isRefresh);
+      setIsLoading(true);
+      if (isRefresh) {
+        activeRefreshRequestId.current = requestId;
+        setIsRefreshing(true);
+      }
 
       try {
         const endpoint = isRefresh ? `/api/refresh${query}` : `/api/dashboard${query}`;
         const response = await fetch(endpoint, {
-          method: isRefresh ? 'POST' : 'GET'
+          method: isRefresh ? 'POST' : 'GET',
+          signal: abortController.signal
         });
         if (!response.ok) {
           throw new Error(`API request failed with ${response.status}`);
         }
         const nextDashboard = (await response.json()) as DashboardData;
+        if (latestRequestId.current !== requestId) {
+          return;
+        }
+
         setDashboard(nextDashboard);
+        if (isUnfilteredQuery) {
+          setSessionOptions(sessionOptionsFromDashboard(nextDashboard.sessions));
+        }
         setSelectedPromptId((current) => {
           if (nextDashboard.prompts.some((prompt) => prompt.promptId === current)) {
             return current;
@@ -218,20 +204,34 @@ export const App = () => {
           return nextDashboard.prompts[0]?.promptId ?? '';
         });
       } catch (requestError) {
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === 'AbortError'
+        ) {
+          return;
+        }
+        if (latestRequestId.current !== requestId) {
+          return;
+        }
         setError(
           requestError instanceof Error
             ? requestError.message
             : 'Unable to load dashboard data'
         );
       } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-        if (isRefresh) {
+        if (activeAbortController.current === abortController) {
+          activeAbortController.current = null;
+        }
+        if (latestRequestId.current === requestId) {
+          setIsLoading(false);
+        }
+        if (isRefresh && activeRefreshRequestId.current === requestId) {
+          setIsRefreshing(false);
           hasCompletedBootstrap.current = true;
         }
       }
     },
-    [query]
+    [isUnfilteredQuery, query]
   );
 
   useEffect(() => {
@@ -245,6 +245,13 @@ export const App = () => {
     }
     void loadDashboard('get');
   }, [loadDashboard]);
+
+  useEffect(
+    () => () => {
+      activeAbortController.current?.abort();
+    },
+    []
+  );
 
   const sortedPrompts = useMemo(
     () => sortRows(dashboard.prompts, promptSort.key, promptSort.direction),
@@ -274,15 +281,6 @@ export const App = () => {
     }));
   };
 
-  const sessionOptions = useMemo(
-    () =>
-      dashboard.sessions.map((session) => ({
-        value: session.sessionId,
-        label: session.sessionId
-      })),
-    [dashboard.sessions]
-  );
-
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -291,15 +289,15 @@ export const App = () => {
           <span>Codex Token Monitor</span>
         </div>
         <nav className="sidebar-nav" aria-label="Dashboard navigation">
-          {navItems.map((item) => (
-            <button
-              className={`nav-item${item.active ? ' nav-item-active' : ''}`}
-              key={item.label}
-              type="button"
-            >
+          <a className="nav-item nav-item-active" href="#overview" aria-current="page">
+            <Home size={17} aria-hidden="true" />
+            <span>Overview</span>
+          </a>
+          {navItems.slice(1).map((item) => (
+            <div className="nav-label" key={item.label}>
               <item.icon size={17} aria-hidden="true" />
               <span>{item.label}</span>
-            </button>
+            </div>
           ))}
         </nav>
         <div className="sidebar-meta">
@@ -315,10 +313,10 @@ export const App = () => {
               {error ? 'Needs attention' : 'Up to date'}
             </strong>
           </div>
-          <button className="theme-toggle" type="button">
+          <div className="theme-status">
             <Moon size={16} aria-hidden="true" />
             <span>Light mode</span>
-          </button>
+          </div>
         </div>
       </aside>
 

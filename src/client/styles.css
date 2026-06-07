@@ -67,20 +67,26 @@ button {
   padding: 0 0 18px;
 }
 
-.nav-item {
+.nav-item,
+.nav-label {
   display: flex;
   align-items: center;
   gap: 16px;
   width: 100%;
   height: 52px;
-  border: 0;
   border-left: 4px solid transparent;
   padding: 0 22px;
-  background: transparent;
-  color: var(--text);
-  cursor: default;
   font-size: 14px;
   text-align: left;
+  text-decoration: none;
+}
+
+.nav-item {
+  color: var(--text);
+}
+
+.nav-label {
+  color: var(--muted);
 }
 
 .nav-item-active {
@@ -130,7 +136,7 @@ button {
   background: var(--teal);
 }
 
-.theme-toggle {
+.theme-status {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -140,6 +146,7 @@ button {
   padding: 0 14px;
   background: var(--background);
   font-size: 14px;
+  color: var(--muted);
 }
 
 .dashboard {
@@ -830,7 +837,8 @@ button {
     padding-bottom: 8px;
   }
 
-  .nav-item {
+  .nav-item,
+  .nav-label {
     flex: 0 0 auto;
     width: auto;
     height: 42px;

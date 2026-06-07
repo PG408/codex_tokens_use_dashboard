@@ -1,9 +1,6 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import type {
-  DashboardPrompt,
-  PromptSortKey
-} from '../App.js';
-import { formatDateTime, formatNumber, formatPercent } from '../App.js';
+import type { DashboardPrompt, PromptSortKey } from '../clientTypes.js';
+import { formatDateTime, formatNumber, formatPercent } from '../formatters.js';
 
 type SortState = {
   key: PromptSortKey;

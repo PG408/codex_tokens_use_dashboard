@@ -9,7 +9,7 @@ import {
   Radio
 } from 'lucide-react';
 import type { DashboardData } from '../../shared/types.js';
-import { formatNumber, formatPercent } from '../App.js';
+import { formatNumber, formatPercent } from '../formatters.js';
 
 type KpiStripProps = {
   kpis: DashboardData['kpis'];

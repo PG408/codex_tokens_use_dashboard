@@ -1,5 +1,5 @@
 import { CalendarDays, RefreshCw, Search } from 'lucide-react';
-import { formatDateTime } from '../App.js';
+import { formatDateTime } from '../formatters.js';
 
 type TimeRange = 'all' | '7d' | '30d';
 

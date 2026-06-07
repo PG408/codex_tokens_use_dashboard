@@ -1,9 +1,6 @@
 import { Info } from 'lucide-react';
-import type {
-  DashboardSession,
-  SessionSortKey
-} from '../App.js';
-import { formatNumber, formatPercent } from '../App.js';
+import type { DashboardSession, SessionSortKey } from '../clientTypes.js';
+import { formatNumber, formatPercent } from '../formatters.js';
 
 type SortState = {
   key: SessionSortKey;
