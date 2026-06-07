@@ -1,6 +1,5 @@
 import {
   AlertCircle,
-  Bell,
   Braces,
   CheckCircle2,
   ClipboardList,
@@ -10,10 +9,9 @@ import {
   Folder,
   Home,
   Moon,
-  Settings,
-  Users
+  Settings
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardData } from '../shared/types.js';
 import { KpiStrip } from './components/KpiStrip.js';
 import { PromptComposition } from './components/PromptComposition.js';
@@ -59,18 +57,13 @@ const emptyDashboard: DashboardData = {
   prompts: []
 };
 
-let didBootstrapRefresh = false;
-
 const navItems = [
   { label: 'Overview', icon: Home, active: true },
   { label: 'Sessions', icon: ClipboardList },
   { label: 'Prompts', icon: FileText },
   { label: 'Models', icon: Braces },
-  { label: 'Users', icon: Users },
   { label: 'Projects', icon: Folder },
   { label: 'Files', icon: Database },
-  { label: 'Alerts', icon: Bell },
-  { label: 'Exports', icon: AlertCircle },
   { label: 'Settings', icon: Settings }
 ];
 
@@ -193,6 +186,8 @@ export const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasStartedBootstrap = useRef(false);
+  const hasCompletedBootstrap = useRef(false);
 
   const query = useMemo(
     () => dashboardQuery(timeRange, sessionId, searchTerm),
@@ -203,7 +198,7 @@ export const App = () => {
     async (mode: 'get' | 'refresh') => {
       const isRefresh = mode === 'refresh';
       setError(null);
-      setIsLoading((current) => current || !dashboard.refreshedAt);
+      setIsLoading((current) => current || mode === 'refresh');
       setIsRefreshing(isRefresh);
 
       try {
@@ -231,15 +226,21 @@ export const App = () => {
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
+        if (isRefresh) {
+          hasCompletedBootstrap.current = true;
+        }
       }
     },
-    [dashboard.refreshedAt, query]
+    [query]
   );
 
   useEffect(() => {
-    if (!didBootstrapRefresh) {
-      didBootstrapRefresh = true;
+    if (!hasStartedBootstrap.current) {
+      hasStartedBootstrap.current = true;
       void loadDashboard('refresh');
+      return;
+    }
+    if (!hasCompletedBootstrap.current) {
       return;
     }
     void loadDashboard('get');

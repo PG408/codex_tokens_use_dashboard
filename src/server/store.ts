@@ -220,52 +220,16 @@ const insertTokenCall = (
   ]);
 };
 
-const compareSessionSnapshot = (
-  left: ParsedSession,
-  right: ParsedSession
-): number => {
-  const totalTokenDelta =
-    left.tokenCalls.reduce((total, tokenCall) => total + tokenCall.totalTokens, 0) -
-    right.tokenCalls.reduce((total, tokenCall) => total + tokenCall.totalTokens, 0);
-  if (totalTokenDelta !== 0) {
-    return totalTokenDelta;
-  }
-
-  const callDelta = left.tokenCalls.length - right.tokenCalls.length;
-  if (callDelta !== 0) {
-    return callDelta;
-  }
-
-  const promptDelta = left.prompts.length - right.prompts.length;
-  if (promptDelta !== 0) {
-    return promptDelta;
-  }
-
-  const lastSeenDelta =
-    Date.parse(left.session.lastSeenAt) - Date.parse(right.session.lastSeenAt);
-  if (lastSeenDelta !== 0) {
-    return lastSeenDelta;
-  }
-
-  return left.session.sourceFile.localeCompare(right.session.sourceFile);
-};
-
-const deduplicateSessionSnapshots = (
+const keepLastSourceFileSnapshot = (
   parsedSessions: ParsedSession[]
 ): ParsedSession[] => {
-  const snapshotsBySessionId = new Map<string, ParsedSession>();
+  const snapshotsBySourceFile = new Map<string, ParsedSession>();
 
   parsedSessions.forEach((parsedSession) => {
-    const current = snapshotsBySessionId.get(parsedSession.session.sessionId);
-    if (
-      current === undefined ||
-      compareSessionSnapshot(parsedSession, current) > 0
-    ) {
-      snapshotsBySessionId.set(parsedSession.session.sessionId, parsedSession);
-    }
+    snapshotsBySourceFile.set(parsedSession.session.sourceFile, parsedSession);
   });
 
-  return [...snapshotsBySessionId.values()];
+  return [...snapshotsBySourceFile.values()];
 };
 
 const countRecordIds = (
@@ -284,6 +248,36 @@ const countRecordIds = (
 const namespaceSessionRecords = (
   parsedSessions: ParsedSession[]
 ): ParsedSession[] => {
+  const sessionIdsBySourceFile = new Map<string, string>();
+  const sessionsByOriginalId = new Map<string, ParsedSession[]>();
+
+  parsedSessions.forEach((parsedSession) => {
+    const snapshots =
+      sessionsByOriginalId.get(parsedSession.session.sessionId) ?? [];
+    snapshots.push(parsedSession);
+    sessionsByOriginalId.set(parsedSession.session.sessionId, snapshots);
+  });
+  sessionsByOriginalId.forEach((snapshots, originalSessionId) => {
+    if (snapshots.length === 1) {
+      sessionIdsBySourceFile.set(
+        snapshots[0].session.sourceFile,
+        originalSessionId
+      );
+      return;
+    }
+
+    [...snapshots]
+      .sort((left, right) =>
+        left.session.sourceFile.localeCompare(right.session.sourceFile)
+      )
+      .forEach((snapshot, index) => {
+        sessionIdsBySourceFile.set(
+          snapshot.session.sourceFile,
+          `${originalSessionId}:${index + 1}`
+        );
+      });
+  });
+
   const promptIdCounts = countRecordIds(parsedSessions, (parsedSession) =>
     parsedSession.prompts.map((prompt) => ({ id: prompt.promptId }))
   );
@@ -295,7 +289,13 @@ const namespaceSessionRecords = (
     const promptIdByOriginalId = new Map<string, string>();
     const promptCounts = new Map<string, number>();
     const callCounts = new Map<string, number>();
-    const sessionId = parsedSession.session.sessionId;
+    const sessionId =
+      sessionIdsBySourceFile.get(parsedSession.session.sourceFile) ??
+      parsedSession.session.sessionId;
+    const session = {
+      ...parsedSession.session,
+      sessionId
+    };
     const prompts = parsedSession.prompts.map((prompt) => {
       const count = (promptCounts.get(prompt.promptId) ?? 0) + 1;
       promptCounts.set(prompt.promptId, count);
@@ -328,6 +328,7 @@ const namespaceSessionRecords = (
 
     return {
       ...parsedSession,
+      session,
       prompts,
       tokenCalls
     };
@@ -343,7 +344,7 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
 
   const replaceAll = (...parsedSessions: ParsedSession[]): void => {
     const sessionSnapshots =
-      namespaceSessionRecords(deduplicateSessionSnapshots(parsedSessions));
+      namespaceSessionRecords(keepLastSourceFileSnapshot(parsedSessions));
 
     db.run('BEGIN');
     try {

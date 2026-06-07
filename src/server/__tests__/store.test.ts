@@ -142,10 +142,13 @@ describe('dashboard store', () => {
     });
   });
 
-  it('deduplicates repeated rollout snapshots for the same session', async () => {
+  it('keeps the last parsed result when the same source file repeats', async () => {
     const store = await createDashboardStore();
+    const first = parsedSession('session-a', 50);
+    const second = parsedSession('session-a', 300);
+    second.session.sourceFile = first.session.sourceFile;
 
-    store.replaceAll(parsedSession('session-a', 50), parsedSession('session-a', 300));
+    store.replaceAll(first, second);
     const dashboard = store.getDashboardData({});
 
     expect(dashboard.kpis.totalTokens).toBe(330);
@@ -155,20 +158,19 @@ describe('dashboard store', () => {
     ]);
   });
 
-  it('namespaces Prompt and token call ids by their final session', async () => {
+  it('keeps duplicate session ids from different source files represented', async () => {
     const store = await createDashboardStore();
     const first = parsedSession('session-a', 50);
-    const second = parsedSession('session-b', 300);
-    second.prompts[0].promptId = first.prompts[0].promptId;
-    second.tokenCalls[0].callId = first.tokenCalls[0].callId;
-    second.tokenCalls[0].promptId = first.prompts[0].promptId;
-    second.tokenCalls[1].promptId = first.prompts[0].promptId;
+    const second = parsedSession('session-a', 300);
+    second.session.sourceFile = '/tmp/session-a-copy.jsonl';
 
     store.replaceAll(first, second);
     const dashboard = store.getDashboardData({});
+    const sessionIds = dashboard.sessions.map((session) => session.sessionId);
 
     expect(dashboard.kpis.totalTokens).toBe(410);
     expect(dashboard.sessions).toHaveLength(2);
+    expect(new Set(sessionIds).size).toBe(2);
     expect(dashboard.prompts).toHaveLength(2);
   });
 
