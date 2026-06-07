@@ -178,9 +178,11 @@ describe('dashboard components', () => {
     expect(html).toContain('gpt-5.5 / high');
     expect(html).toContain('Context window');
     expect(html).toContain('258.4K');
-    expect(html).toContain('Input source attribution');
-    expect(html).toContain('User prompt');
-    expect(html).toContain('Tool output: exec_command');
+    expect(html).toContain('Token type contribution');
+    expect(html).toContain('Input source contribution');
+    expect(html).toContain('User input');
+    expect(html).toContain('Tool context');
+    expect(html).toContain('Drill down');
     expect(html).toContain('Estimated from visible JSONL context');
   });
 

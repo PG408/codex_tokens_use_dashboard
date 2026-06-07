@@ -16,6 +16,21 @@ const sessionMeta = JSON.stringify({
   }
 });
 
+const sessionMetaWithInstructions = (instructions: string): string =>
+  JSON.stringify({
+    timestamp: '2026-06-07T01:00:00.000Z',
+    type: 'session_meta',
+    payload: {
+      id: 'session-a',
+      timestamp: '2026-06-07T00:59:00.000Z',
+      cwd: '/tmp/project',
+      originator: 'Codex Desktop',
+      model_provider: 'openai',
+      cli_version: '0.137.0',
+      instructions
+    }
+  });
+
 const userMessage = (timestamp: string, text: string): string =>
   JSON.stringify({
     timestamp,
@@ -234,6 +249,73 @@ describe('parseSessionJsonl', () => {
           sourceId: 'tool_outputs:Tool output: web.run',
           label: 'Tool output: web.run',
           chars: 'web output'.length
+        })
+      ])
+    );
+  });
+
+  it('aggregates plugin-bundled skills by plugin name', () => {
+    const superpowersBrainstorming =
+      '<skill><name>superpowers:brainstorming</name><path>/Users/bytedance/.codex/plugins/cache/openai-curated/superpowers/3f0def1b/skills/brainstorming/SKILL.md</path>Brainstorming guide.</skill>';
+    const superpowersVerification =
+      '<skill><name>superpowers:verification-before-completion</name><path>/Users/bytedance/.codex/plugins/cache/openai-curated/superpowers/3f0def1b/skills/verification-before-completion/SKILL.md</path>Verification guide.</skill>';
+    const standaloneSkill =
+      '<skill><name>openai-docs</name><path>/Users/bytedance/.codex/skills/openai-docs/SKILL.md</path>OpenAI docs guide.</skill>';
+    const jsonl = [
+      sessionMetaWithInstructions(
+        `Use these skills:\n${superpowersBrainstorming}\n${superpowersVerification}\n${standaloneSkill}`
+      ),
+      userMessage('2026-06-07T01:00:01.000Z', 'Inspect skill attribution')
+    ].join('\n');
+
+    const parsed = parseSessionJsonl(jsonl, sourceFile);
+
+    expect(parsed.prompts[0].inputSources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceId: 'instructions_skills:Skill: Superpowers',
+          label: 'Skill: Superpowers',
+          chars: superpowersBrainstorming.length + superpowersVerification.length,
+          events: 2
+        }),
+        expect.objectContaining({
+          sourceId: 'instructions_skills:Skill: openai-docs',
+          label: 'Skill: openai-docs',
+          chars: standaloneSkill.length,
+          events: 1
+        })
+      ])
+    );
+    expect(parsed.prompts[0].inputSources).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: 'Skill: brainstorming'
+        })
+      ])
+    );
+  });
+
+  it('infers plugin names from plugin-bundled skill paths', () => {
+    const skillPath =
+      '/Users/bytedance/.codex/plugins/cache/openai-curated/superpowers/3f0def1b/skills/brainstorming/SKILL.md';
+    const legacySkillPath =
+      '/Users/bytedance/.codex/superpowers/skills/verification-before-completion/SKILL.md';
+    const jsonl = [
+      sessionMetaWithInstructions(
+        `Skill path only: ${skillPath}\nLegacy path: ${legacySkillPath}`
+      ),
+      userMessage('2026-06-07T01:00:01.000Z', 'Inspect skill path attribution')
+    ].join('\n');
+
+    const parsed = parseSessionJsonl(jsonl, sourceFile);
+
+    expect(parsed.prompts[0].inputSources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceId: 'instructions_skills:Skill: Superpowers',
+          label: 'Skill: Superpowers',
+          chars: skillPath.length + legacySkillPath.length,
+          events: 2
         })
       ])
     );

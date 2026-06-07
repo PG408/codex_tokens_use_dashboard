@@ -860,56 +860,14 @@ button {
   font-weight: 700;
 }
 
-.donut-wrap {
-  position: relative;
-  height: 190px;
-  margin: 0 16px;
-}
-
-.donut-center {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-content: center;
-  gap: 4px;
-  pointer-events: none;
-  text-align: center;
-}
-
-.donut-center strong {
-  font-size: 20px;
-}
-
-.donut-center span {
-  max-width: 92px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.composition-list {
-  display: grid;
-  gap: 12px;
-  margin: 16px 0 0;
-  padding: 0 16px;
-  list-style: none;
-}
-
-.composition-list li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 3px 9px;
-  font-size: 12px;
-}
-
-.composition-list strong {
-  grid-column: 2;
-  color: var(--text);
-}
-
+.token-breakdown-section,
 .input-source-section {
   display: grid;
   gap: 10px;
-  margin: 18px 16px 0;
+  margin: 16px 16px 0;
+}
+
+.input-source-section {
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
@@ -932,7 +890,7 @@ button {
   font-weight: 800;
 }
 
-.input-source-list {
+.bar-list {
   display: grid;
   gap: 10px;
   margin: 0;
@@ -940,7 +898,12 @@ button {
   list-style: none;
 }
 
-.input-source-row {
+.bar-list li {
+  display: grid;
+  gap: 6px;
+}
+
+.bar-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -949,35 +912,72 @@ button {
   font-weight: 700;
 }
 
-.input-source-row span {
+.bar-row span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.input-source-row strong {
+.bar-row strong {
   flex: 0 0 auto;
 }
 
-.input-source-track {
+.bar-track {
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--surface);
 }
 
-.input-source-track span {
+.bar-track span {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: var(--teal);
 }
 
-.input-source-meta {
+.bar-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   color: var(--muted);
   font-size: 11px;
+}
+
+.source-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.source-breadcrumb button,
+.source-drill-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.source-breadcrumb button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.source-breadcrumb button.active {
+  border-color: color-mix(in srgb, var(--teal) 38%, var(--border));
+  color: var(--teal);
+}
+
+.source-drill-button {
+  cursor: pointer;
+}
+
+.source-drill-button:disabled {
+  cursor: default;
 }
 
 .input-source-empty,

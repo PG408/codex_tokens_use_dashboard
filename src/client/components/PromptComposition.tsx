@@ -1,5 +1,9 @@
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import type { InputSourceEstimate, TokenUsage } from '../../shared/types.js';
+import { useEffect, useMemo, useState } from 'react';
+import type {
+  InputSourceCategory,
+  InputSourceEstimate,
+  TokenUsage
+} from '../../shared/types.js';
 import { formatNumber, formatPercent } from '../formatters.js';
 
 type PromptCompositionProps = {
@@ -23,7 +27,169 @@ const COLORS = {
   reasoning: '#f5b82e'
 };
 
+type TokenCompositionRow = {
+  id: string;
+  label: string;
+  value: number;
+  color: string;
+};
+
+type SourceHierarchyLeaf = {
+  source: InputSourceEstimate;
+  topId: string;
+  topLabel: string;
+  secondId: string;
+  secondLabel: string;
+  thirdId: string;
+  thirdLabel: string;
+};
+
+type SourceContributionRow = {
+  id: string;
+  label: string;
+  estimatedTokens: number;
+  share: number;
+  chars: number;
+  events: number;
+  confidence: InputSourceEstimate['confidence'];
+  canDrill: boolean;
+};
+
+type SourceDrillPath = {
+  topId?: string;
+  secondId?: string;
+};
+
+const sourceTopGroup = (
+  category: InputSourceCategory
+): { id: string; label: string } => {
+  if (category === 'tool_calls' || category === 'tool_outputs') {
+    return { id: 'tools', label: 'Tool context' };
+  }
+
+  if (category === 'conversation_history' || category === 'compacted_history') {
+    return { id: 'conversation', label: 'Conversation context' };
+  }
+
+  if (category === 'user_prompt') {
+    return { id: 'user', label: 'User input' };
+  }
+
+  return { id: 'system', label: 'System context' };
+};
+
+const defaultSourceSecondLabels: Record<InputSourceCategory, string> = {
+  user_prompt: 'Direct user prompt',
+  system_developer: 'System and developer',
+  instructions_skills: 'Instructions',
+  conversation_history: 'Conversation history',
+  tool_calls: 'Tool calls',
+  tool_outputs: 'Tool outputs',
+  compacted_history: 'Compacted history',
+  runtime_metadata: 'Runtime metadata'
+};
+
+const sourceSecondLabel = (source: InputSourceEstimate): string => {
+  if (source.category !== 'instructions_skills') {
+    return defaultSourceSecondLabels[source.category];
+  }
+
+  if (source.label.startsWith('Skill: ')) {
+    return 'Skills';
+  }
+
+  if (source.label === 'Dynamic tools') {
+    return 'Dynamic tools';
+  }
+
+  return 'Instructions';
+};
+
+const sourceThirdLabel = (source: InputSourceEstimate): string =>
+  source.label
+    .replace(/^Tool (call|output):\s*/, '')
+    .replace(/^Skill:\s*/, '');
+
+const hierarchyLeavesFrom = (
+  inputSources: InputSourceEstimate[]
+): SourceHierarchyLeaf[] =>
+  inputSources.map((source) => {
+    const top = sourceTopGroup(source.category);
+    const secondLabel = sourceSecondLabel(source);
+    const thirdLabel = sourceThirdLabel(source);
+
+    return {
+      source,
+      topId: top.id,
+      topLabel: top.label,
+      secondId: `${top.id}:${source.category}:${secondLabel}`,
+      secondLabel,
+      thirdId: source.sourceId,
+      thirdLabel
+    };
+  });
+
+const aggregateContributionRows = (
+  leaves: SourceHierarchyLeaf[],
+  level: 'top' | 'second' | 'third',
+  denominator: number
+): SourceContributionRow[] => {
+  const rows = new Map<string, SourceContributionRow>();
+
+  leaves.forEach((leaf) => {
+    const id =
+      level === 'top'
+        ? leaf.topId
+        : level === 'second'
+          ? leaf.secondId
+          : leaf.thirdId;
+    const label =
+      level === 'top'
+        ? leaf.topLabel
+        : level === 'second'
+          ? leaf.secondLabel
+          : leaf.thirdLabel;
+    const existing = rows.get(id);
+    rows.set(id, {
+      id,
+      label,
+      estimatedTokens:
+        (existing?.estimatedTokens ?? 0) + leaf.source.estimatedTokens,
+      share: 0,
+      chars: (existing?.chars ?? 0) + leaf.source.chars,
+      events: (existing?.events ?? 0) + leaf.source.events,
+      confidence: existing?.confidence ?? leaf.source.confidence,
+      canDrill: level !== 'third'
+    });
+  });
+
+  const shareDenominator =
+    denominator > 0
+      ? denominator
+      : [...rows.values()].reduce((sum, row) => sum + row.estimatedTokens, 0);
+
+  return [...rows.values()]
+    .map((row) => ({
+      ...row,
+      share:
+        shareDenominator > 0 ? row.estimatedTokens / shareDenominator : 0
+    }))
+    .sort((left, right) => right.estimatedTokens - left.estimatedTokens);
+};
+
+const rowTrackWidth = (share: number): string => `${Math.max(share * 100, 2)}%`;
+
 export const PromptComposition = ({ context }: PromptCompositionProps) => {
+  const [sourceDrillPath, setSourceDrillPath] = useState<SourceDrillPath>({});
+  const hierarchyLeaves = useMemo(
+    () => (context ? hierarchyLeavesFrom(context.inputSources) : []),
+    [context]
+  );
+
+  useEffect(() => {
+    setSourceDrillPath({});
+  }, [context?.kind, context?.title]);
+
   if (context === null) {
     return (
       <aside className="panel composition-panel">
@@ -39,21 +205,63 @@ export const PromptComposition = ({ context }: PromptCompositionProps) => {
     context.usage.inputTokens - context.usage.cachedInputTokens,
     0
   );
-  const donutData = [
+  const tokenCompositionRows: TokenCompositionRow[] = [
     {
-      name: 'Cached input tokens',
+      id: 'cached',
+      label: 'Cached input tokens',
       value: context.usage.cachedInputTokens,
       color: COLORS.cached
     },
-    { name: 'Non-cached input tokens', value: nonCachedInput, color: COLORS.nonCached },
-    { name: 'Output tokens', value: context.usage.outputTokens, color: COLORS.output },
     {
-      name: 'Reasoning output tokens',
+      id: 'non-cached',
+      label: 'Non-cached input tokens',
+      value: nonCachedInput,
+      color: COLORS.nonCached
+    },
+    {
+      id: 'output',
+      label: 'Output tokens',
+      value: context.usage.outputTokens,
+      color: COLORS.output
+    },
+    {
+      id: 'reasoning',
+      label: 'Reasoning output tokens',
       value: context.usage.reasoningOutputTokens,
       color: COLORS.reasoning
     }
   ].filter((item) => item.value > 0);
-  const inputSources = context.inputSources.slice(0, 8);
+  const tokenCompositionTotal = tokenCompositionRows.reduce(
+    (sum, row) => sum + row.value,
+    0
+  );
+  const selectedTop = sourceDrillPath.topId
+    ? hierarchyLeaves.find((leaf) => leaf.topId === sourceDrillPath.topId)
+    : undefined;
+  const selectedSecond = sourceDrillPath.secondId
+    ? hierarchyLeaves.find((leaf) => leaf.secondId === sourceDrillPath.secondId)
+    : undefined;
+  const contributionLeaves = hierarchyLeaves.filter((leaf) => {
+    if (sourceDrillPath.secondId) {
+      return leaf.secondId === sourceDrillPath.secondId;
+    }
+    if (sourceDrillPath.topId) {
+      return leaf.topId === sourceDrillPath.topId;
+    }
+    return true;
+  });
+  const contributionRows = aggregateContributionRows(
+    contributionLeaves,
+    sourceDrillPath.secondId
+      ? 'third'
+      : sourceDrillPath.topId
+        ? 'second'
+        : 'top',
+    contributionLeaves.reduce(
+      (sum, leaf) => sum + leaf.source.estimatedTokens,
+      0
+    )
+  );
 
   return (
     <aside className="panel composition-panel">
@@ -74,76 +282,97 @@ export const PromptComposition = ({ context }: PromptCompositionProps) => {
         ))}
       </dl>
 
-      <div className="donut-wrap">
-        <ResponsiveContainer width="100%" height={190}>
-          <PieChart>
-            <Pie
-              data={donutData}
-              dataKey="value"
-              nameKey="name"
-              innerRadius={54}
-              outerRadius={76}
-              paddingAngle={2}
-            >
-              {donutData.map((entry) => (
-                <Cell key={entry.name} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(value: number, name: string) => [formatNumber(value), name]} />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="donut-center">
-          <strong>{formatNumber(context.usage.inputTokens)}</strong>
-          <span>Total input tokens</span>
+      <section className="token-breakdown-section">
+        <div className="section-subheading">
+          <h3>Token type contribution</h3>
+          <span>{formatNumber(context.usage.totalTokens)} total</span>
         </div>
-      </div>
-
-      <ul className="composition-list">
-        <li>
-          <span className="swatch cached" />
-          <span>Cached input tokens</span>
-          <strong>
-            {formatNumber(context.usage.cachedInputTokens)} (
-            {formatPercent(context.inputCacheHitRate)})
-          </strong>
-        </li>
-        <li>
-          <span className="swatch non-cached" />
-          <span>Non-cached input tokens</span>
-          <strong>{formatNumber(nonCachedInput)}</strong>
-        </li>
-        <li>
-          <span className="swatch output" />
-          <span>Output tokens</span>
-          <strong>{formatNumber(context.usage.outputTokens)}</strong>
-        </li>
-        <li>
-          <span className="swatch reasoning" />
-          <span>Reasoning output tokens</span>
-          <strong>{formatNumber(context.usage.reasoningOutputTokens)}</strong>
-        </li>
-      </ul>
+        <ul className="bar-list token-bar-list">
+          {tokenCompositionRows.map((row) => {
+            const share =
+              tokenCompositionTotal > 0 ? row.value / tokenCompositionTotal : 0;
+            return (
+              <li key={row.id}>
+                <div className="bar-row">
+                  <span>{row.label}</span>
+                  <strong>
+                    {formatNumber(row.value)} ({formatPercent(share)})
+                  </strong>
+                </div>
+                <div className="bar-track" aria-hidden="true">
+                  <span
+                    style={{
+                      background: row.color,
+                      width: rowTrackWidth(share)
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       <section className="input-source-section">
         <div className="section-subheading">
-          <h3>Input source attribution</h3>
+          <h3>Input source contribution</h3>
           <span>Estimated</span>
         </div>
-        {inputSources.length > 0 ? (
-          <ul className="input-source-list">
-            {inputSources.map((source) => (
-              <li key={source.sourceId}>
-                <div className="input-source-row">
-                  <span>{source.label}</span>
-                  <strong>{formatNumber(source.estimatedTokens)}</strong>
+        <div className="source-breadcrumb" aria-label="Input source level">
+          <button
+            className={!sourceDrillPath.topId ? 'active' : undefined}
+            type="button"
+            onClick={() => setSourceDrillPath({})}
+          >
+            Level 1
+          </button>
+          {selectedTop ? (
+            <button
+              className={!sourceDrillPath.secondId ? 'active' : undefined}
+              type="button"
+              onClick={() => setSourceDrillPath({ topId: selectedTop.topId })}
+            >
+              {selectedTop.topLabel}
+            </button>
+          ) : null}
+          {selectedSecond ? (
+            <button className="active" type="button">
+              {selectedSecond.secondLabel}
+            </button>
+          ) : null}
+        </div>
+        {contributionRows.length > 0 ? (
+          <ul className="bar-list input-source-list">
+            {contributionRows.map((row) => (
+              <li key={row.id}>
+                <button
+                  className="source-drill-button"
+                  disabled={!row.canDrill}
+                  type="button"
+                  onClick={() => {
+                    if (!sourceDrillPath.topId) {
+                      setSourceDrillPath({ topId: row.id });
+                      return;
+                    }
+                    setSourceDrillPath({
+                      topId: sourceDrillPath.topId,
+                      secondId: row.id
+                    });
+                  }}
+                >
+                  <div className="bar-row">
+                    <span>{row.label}</span>
+                    <strong>{formatNumber(row.estimatedTokens)}</strong>
+                  </div>
+                </button>
+                <div className="bar-track" aria-hidden="true">
+                  <span style={{ width: rowTrackWidth(row.share) }} />
                 </div>
-                <div className="input-source-track" aria-hidden="true">
-                  <span style={{ width: `${Math.max(source.share * 100, 2)}%` }} />
-                </div>
-                <div className="input-source-meta">
-                  <span>{formatPercent(source.share)}</span>
-                  <span>{formatNumber(source.chars)} chars</span>
-                  <span>{source.confidence}</span>
+                <div className="bar-meta">
+                  <span>{formatPercent(row.share)}</span>
+                  <span>{formatNumber(row.chars)} chars</span>
+                  <span>{row.confidence}</span>
+                  {row.canDrill ? <span>Drill down</span> : null}
                 </div>
               </li>
             ))}

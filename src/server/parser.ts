@@ -9,6 +9,12 @@ import type {
 
 type JsonObject = Record<string, unknown>;
 type InputSourceAccumulator = Map<string, InputSourceRecord>;
+type SkillMatch = {
+  start: number;
+  end: number;
+  label: string;
+  value: string;
+};
 
 const inputSourceLabels: Record<InputSourceCategory, string> = {
   user_prompt: 'User prompt',
@@ -137,6 +143,183 @@ const toolOutputLabel = (toolName: string): string => `Tool output: ${toolName}`
 
 const callIdFromPayload = (payload: JsonObject): string =>
   typeof payload.call_id === 'string' ? payload.call_id : '';
+
+const pluginDisplayNames: Record<string, string> = {
+  browser: 'Browser',
+  'build-macos-apps': 'Build macOS Apps',
+  'build-web-apps': 'Build Web Apps',
+  'build-web-data-visualization': 'Build Web Data Visualization',
+  chrome: 'Chrome',
+  'computer-use': 'Computer Use',
+  'data-analytics': 'Data Analytics',
+  github: 'GitHub',
+  'product-design': 'Product Design',
+  superpowers: 'Superpowers'
+};
+
+const pluginIdFromSkillPath = (path: string): string => {
+  if (path.includes('/.codex/superpowers/skills/')) {
+    return 'superpowers';
+  }
+
+  const pluginMatch = path.match(/plugins\/cache\/[^/]+\/([^/]+)\//);
+  if (
+    pluginMatch &&
+    (pluginMatch[1] === 'openai-curated' ||
+      pluginMatch[1] === 'openai-curated-remote' ||
+      pluginMatch[1] === 'openai-bundled')
+  ) {
+    return path.match(/plugins\/cache\/[^/]+\/[^/]+\/([^/]+)\//)?.[1] ?? '';
+  }
+
+  return pluginMatch?.[1] ?? '';
+};
+
+const skillDisplayName = (name: string, path = ''): string => {
+  const namePluginId = name.includes(':') ? name.split(':')[0] : '';
+  const pathPluginId = pluginIdFromSkillPath(path);
+  const pluginDisplay =
+    pluginDisplayNames[namePluginId] ?? pluginDisplayNames[pathPluginId];
+
+  if (pluginDisplay) {
+    return pluginDisplay;
+  }
+
+  return name.includes(':') ? name.split(':')[1] : name;
+};
+
+const skillLabel = (name: string, path = ''): string =>
+  `Skill: ${skillDisplayName(name.trim(), path.trim())}`;
+
+const isRangeAvailable = (
+  matches: SkillMatch[],
+  start: number,
+  end: number
+): boolean =>
+  matches.every((match) => end <= match.start || start >= match.end);
+
+const addSkillMatch = (
+  matches: SkillMatch[],
+  start: number,
+  end: number,
+  name: string,
+  path: string,
+  value: string
+): void => {
+  const cleanName = name.trim();
+  if (!cleanName || !isRangeAvailable(matches, start, end)) {
+    return;
+  }
+
+  matches.push({
+    start,
+    end,
+    label: skillLabel(cleanName, path),
+    value
+  });
+};
+
+const skillMatchesFromText = (text: string): SkillMatch[] => {
+  const matches: SkillMatch[] = [];
+  const skillBlockPattern = /<skill>[\s\S]*?<\/skill>/g;
+  let skillBlock: RegExpExecArray | null;
+
+  while ((skillBlock = skillBlockPattern.exec(text)) !== null) {
+    const block = skillBlock[0];
+    const name = block.match(/<name>([^<]+)<\/name>/)?.[1] ?? '';
+    const path = block.match(/<path>([^<]+SKILL\.md)<\/path>/)?.[1] ?? '';
+    addSkillMatch(
+      matches,
+      skillBlock.index,
+      skillBlock.index + block.length,
+      name,
+      path,
+      block
+    );
+  }
+
+  const namePathPattern =
+    /<name>([^<]+)<\/name>\s*<path>([^<]+SKILL\.md)<\/path>/g;
+  let namePathMatch: RegExpExecArray | null;
+  while ((namePathMatch = namePathPattern.exec(text)) !== null) {
+    addSkillMatch(
+      matches,
+      namePathMatch.index,
+      namePathMatch.index + namePathMatch[0].length,
+      namePathMatch[1],
+      namePathMatch[2],
+      namePathMatch[0]
+    );
+  }
+
+  const pathPattern = /([^\s<>"']*\/skills\/([^/\s<>"']+)\/SKILL\.md)/g;
+  let pathMatch: RegExpExecArray | null;
+  while ((pathMatch = pathPattern.exec(text)) !== null) {
+    addSkillMatch(
+      matches,
+      pathMatch.index,
+      pathMatch.index + pathMatch[0].length,
+      pathMatch[2],
+      pathMatch[1],
+      pathMatch[0]
+    );
+  }
+
+  const prefixedNamePattern =
+    /(?:^|[\s"'`([{])([a-z0-9-]+:[a-z0-9-]+)(?=$|[\s"'`)\]}.,:;])/g;
+  let prefixedNameMatch: RegExpExecArray | null;
+  while ((prefixedNameMatch = prefixedNamePattern.exec(text)) !== null) {
+    const name = prefixedNameMatch[1];
+    const start = prefixedNameMatch.index + prefixedNameMatch[0].indexOf(name);
+    addSkillMatch(
+      matches,
+      start,
+      start + name.length,
+      name,
+      '',
+      name
+    );
+  }
+
+  return matches.sort((left, right) => left.start - right.start);
+};
+
+const addInstructionInputSource = (
+  accumulator: InputSourceAccumulator,
+  value: unknown,
+  fallbackLabel = 'Instructions'
+): void => {
+  if (value === null || value === undefined) {
+    return;
+  }
+
+  if (typeof value !== 'string') {
+    addInputSource(accumulator, 'instructions_skills', value, fallbackLabel);
+    return;
+  }
+
+  const matches = skillMatchesFromText(value);
+  if (matches.length === 0) {
+    addInputSource(accumulator, 'instructions_skills', value, fallbackLabel);
+    return;
+  }
+
+  matches.forEach((match) => {
+    addInputSource(accumulator, 'instructions_skills', match.value, match.label);
+  });
+
+  let cursor = 0;
+  let remainder = '';
+  matches.forEach((match) => {
+    remainder += value.slice(cursor, match.start);
+    cursor = match.end;
+  });
+  remainder += value.slice(cursor);
+
+  if (remainder.trim().length > 0) {
+    addInputSource(accumulator, 'instructions_skills', remainder, fallbackLabel);
+  }
+};
 
 const addUsage = (target: TokenUsage, delta: TokenUsage): void => {
   target.inputTokens += delta.inputTokens;
@@ -304,8 +487,12 @@ export const parseSessionJsonl = (
           (payload.base_instructions as JsonObject).text
         );
       }
-      addInputSource(sessionContextSources, 'instructions_skills', payload.instructions);
-      addInputSource(sessionContextSources, 'instructions_skills', payload.dynamic_tools);
+      addInstructionInputSource(sessionContextSources, payload.instructions);
+      addInstructionInputSource(
+        sessionContextSources,
+        payload.dynamic_tools,
+        'Dynamic tools'
+      );
       return;
     }
 
@@ -330,7 +517,7 @@ export const parseSessionJsonl = (
         'system_developer',
         settings.developer_instructions
       );
-      addInputSource(turnContextSources, 'instructions_skills', payload.user_instructions);
+      addInstructionInputSource(turnContextSources, payload.user_instructions);
       addInputSource(
         turnContextSources,
         'runtime_metadata',
