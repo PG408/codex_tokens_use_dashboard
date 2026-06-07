@@ -51,6 +51,17 @@ const numberValue = (value: SqlValue): number =>
 const stringValue = (value: SqlValue): string =>
   typeof value === 'string' ? value : '';
 
+const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+const normalizeFromFilter = (value: string): string =>
+  dateOnlyPattern.test(value) ? `${value}T00:00:00.000Z` : value;
+
+const normalizeToFilter = (value: string): string =>
+  dateOnlyPattern.test(value) ? `${value}T23:59:59.999Z` : value;
+
+const escapeLikePattern = (value: string): string =>
+  value.replace(/[\\%_]/g, (character) => `\\${character}`);
+
 const usageFromRow = (row: SqlRow): TokenUsage => ({
   inputTokens: numberValue(row.inputTokens),
   cachedInputTokens: numberValue(row.cachedInputTokens),
@@ -140,12 +151,12 @@ const bindFilters = (filters: DashboardFilters): {
 
   if (filters.from) {
     clauses.push('tc.occurred_at >= $from');
-    params.$from = filters.from;
+    params.$from = normalizeFromFilter(filters.from);
   }
 
   if (filters.to) {
     clauses.push('tc.occurred_at <= $to');
-    params.$to = filters.to;
+    params.$to = normalizeToFilter(filters.to);
   }
 
   if (filters.sessionId) {
@@ -154,8 +165,8 @@ const bindFilters = (filters: DashboardFilters): {
   }
 
   if (filters.q) {
-    clauses.push('p.prompt_preview LIKE $q');
-    params.$q = `%${filters.q}%`;
+    clauses.push("p.prompt_preview LIKE $q ESCAPE '\\'");
+    params.$q = `%${escapeLikePattern(filters.q)}%`;
   }
 
   return {

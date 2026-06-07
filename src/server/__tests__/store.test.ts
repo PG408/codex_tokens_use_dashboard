@@ -4,7 +4,8 @@ import type { ParsedSession } from '../../shared/types.js';
 
 const parsedSession = (
   sessionId: string,
-  totalTokens: number
+  totalTokens: number,
+  promptPreview = `${sessionId} dashboard analysis`
 ): ParsedSession => ({
   session: {
     sessionId,
@@ -21,7 +22,7 @@ const parsedSession = (
       promptId: `${sessionId}:prompt-1`,
       sessionId,
       startedAt: '2026-06-07T00:05:00.000Z',
-      promptPreview: `${sessionId} dashboard analysis`,
+      promptPreview,
       callCount: 2,
       inputTokens: totalTokens === 300 ? 120 : 0,
       cachedInputTokens: totalTokens === 300 ? 60 : 0,
@@ -174,5 +175,37 @@ describe('dashboard store', () => {
     expect(dashboard.trend[0].bucket).toBe('2026-06-08');
     expect(dashboard.prompts).toHaveLength(1);
     expect(dashboard.prompts[0].promptId).toBe('session-a:prompt-1');
+  });
+
+  it('treats date-only to filters as the end of that UTC day', async () => {
+    const store = await createDashboardStore();
+
+    store.replaceAll(parsedSession('session-a', 300));
+    const dashboard = store.getDashboardData({
+      to: '2026-06-08',
+      sessionId: 'session-a',
+      q: 'analysis'
+    });
+
+    expect(dashboard.kpis.totalTokens).toBe(300);
+    expect(dashboard.trend.map((bucket) => bucket.bucket)).toEqual([
+      '2026-06-07',
+      '2026-06-08'
+    ]);
+  });
+
+  it('searches Prompt previews with literal percent and underscore characters', async () => {
+    const store = await createDashboardStore();
+
+    store.replaceAll(
+      parsedSession('session-a', 300),
+      parsedSession('session-special', 70, 'literal 100%_match')
+    );
+    const dashboard = store.getDashboardData({ q: '%' });
+
+    expect(dashboard.kpis.totalTokens).toBe(70);
+    expect(dashboard.prompts.map((prompt) => prompt.promptPreview)).toEqual([
+      'literal 100%_match'
+    ]);
   });
 });
