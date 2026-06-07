@@ -612,6 +612,19 @@ button {
   min-width: 1040px;
 }
 
+.prompt-table th:nth-child(2),
+.prompt-table td:nth-child(2) {
+  width: 190px;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prompt-table th:nth-child(3),
+.prompt-table td:nth-child(3) {
+  width: 82px;
+}
+
 .prompt-table tbody tr,
 .compact-table tbody tr {
   cursor: default;
@@ -623,6 +636,7 @@ button {
 }
 
 .prompt-preview {
+  width: 300px;
   min-width: 260px;
   max-width: 360px;
   white-space: normal;
