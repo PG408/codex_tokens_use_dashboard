@@ -51,6 +51,7 @@ describe('dashboard components', () => {
     );
 
     expect(html).toContain('session-alpha');
+    expect(html).toContain('prompt-preview-text');
     expect(html).not.toContain('link-button');
   });
 

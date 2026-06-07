@@ -109,7 +109,9 @@ export const PromptTable = ({
                 <td>{formatDateTime(prompt.startedAt)}</td>
                 <td>{prompt.sessionId}</td>
                 <td>{prompt.model || 'unknown'}</td>
-                <td className="prompt-preview">{prompt.promptPreview}</td>
+                <td className="prompt-preview">
+                  <div className="prompt-preview-text">{prompt.promptPreview}</div>
+                </td>
                 <td>{formatNumber(prompt.totalTokens)}</td>
                 <td>{formatNumber(prompt.inputTokens)}</td>
                 <td>{formatNumber(prompt.cachedInputTokens)}</td>

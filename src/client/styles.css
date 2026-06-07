@@ -696,8 +696,19 @@ button {
   width: 300px;
   min-width: 260px;
   max-width: 360px;
-  white-space: normal;
+  overflow: hidden;
+}
+
+.prompt-preview-text {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .rate-good {
