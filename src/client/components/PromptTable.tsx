@@ -1,11 +1,6 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { DashboardPrompt, PromptSortKey } from '../clientTypes.js';
 import { formatDateTime, formatNumber, formatPercent } from '../formatters.js';
-import {
-  projectNameFromCwd,
-  sessionHoverTitle,
-  sessionName
-} from '../sessionDisplay.js';
 
 type SortState = {
   key: PromptSortKey;
@@ -112,10 +107,7 @@ export const PromptTable = ({
                 onClick={() => onPromptSelect(prompt.promptId)}
               >
                 <td>{formatDateTime(prompt.startedAt)}</td>
-                <td className="session-display-cell" title={sessionHoverTitle(prompt)}>
-                  <strong>{projectNameFromCwd(prompt.cwd)}</strong>
-                  <span>{sessionName(prompt)}</span>
-                </td>
+                <td>{prompt.sessionId}</td>
                 <td>{prompt.model || 'unknown'}</td>
                 <td className="prompt-preview">
                   <div className="prompt-preview-text">{prompt.promptPreview}</div>

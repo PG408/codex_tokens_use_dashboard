@@ -59,15 +59,12 @@ export type DashboardData = {
     SessionRecord &
       TokenUsage & {
         inputCacheHitRate: number | null;
-        sessionName: string;
       }
   >;
   prompts: Array<
     PromptRecord & {
-      cwd: string;
       inputCacheHitRate: number | null;
       model: string;
-      sessionName: string;
     }
   >;
 };

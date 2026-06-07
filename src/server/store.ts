@@ -466,15 +466,6 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           s.model_provider AS modelProvider,
           s.cli_version AS cliVersion,
           s.last_seen_at AS lastSeenAt,
-          COALESCE((
-            SELECT first_prompt.prompt_preview
-            FROM prompts first_prompt
-            WHERE first_prompt.session_id = s.session_id
-              AND first_prompt.prompt_preview != 'unattributed'
-              AND first_prompt.prompt_preview NOT LIKE '# AGENTS.md instructions%'
-            ORDER BY first_prompt.started_at ASC
-            LIMIT 1
-          ), 'Untitled session') AS sessionName,
           ${usageSelect}
         FROM token_calls tc
         JOIN prompts p ON p.prompt_id = tc.prompt_id
@@ -495,7 +486,6 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
         modelProvider: stringValue(row.modelProvider),
         cliVersion: stringValue(row.cliVersion),
         lastSeenAt: stringValue(row.lastSeenAt),
-        sessionName: stringValue(row.sessionName),
         ...usage,
         inputCacheHitRate: cacheRate(
           usage.cachedInputTokens,
@@ -513,17 +503,7 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
           p.started_at AS startedAt,
           p.prompt_preview AS promptPreview,
           COUNT(tc.call_id) AS callCount,
-          s.cwd,
           s.model_provider AS model,
-          COALESCE((
-            SELECT first_prompt.prompt_preview
-            FROM prompts first_prompt
-            WHERE first_prompt.session_id = p.session_id
-              AND first_prompt.prompt_preview != 'unattributed'
-              AND first_prompt.prompt_preview NOT LIKE '# AGENTS.md instructions%'
-            ORDER BY first_prompt.started_at ASC
-            LIMIT 1
-          ), 'Untitled session') AS sessionName,
           ${usageSelect}
         FROM token_calls tc
         JOIN prompts p ON p.prompt_id = tc.prompt_id
@@ -542,14 +522,12 @@ export const createDashboardStore = async (): Promise<DashboardStore> => {
         startedAt: stringValue(row.startedAt),
         promptPreview: stringValue(row.promptPreview),
         callCount: numberValue(row.callCount),
-        cwd: stringValue(row.cwd),
         ...usage,
         inputCacheHitRate: cacheRate(
           usage.cachedInputTokens,
           usage.inputTokens
         ),
-        model: stringValue(row.model),
-        sessionName: stringValue(row.sessionName)
+        model: stringValue(row.model)
       };
     });
 

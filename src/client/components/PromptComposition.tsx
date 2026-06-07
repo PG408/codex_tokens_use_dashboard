@@ -1,11 +1,6 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { DashboardPrompt } from '../clientTypes.js';
 import { formatDateTime, formatNumber, formatPercent } from '../formatters.js';
-import {
-  projectNameFromCwd,
-  sessionHoverTitle,
-  sessionName
-} from '../sessionDisplay.js';
 
 type PromptCompositionProps = {
   prompt: DashboardPrompt | null;
@@ -58,9 +53,7 @@ export const PromptComposition = ({ prompt }: PromptCompositionProps) => {
         </div>
         <div>
           <dt>Session</dt>
-          <dd title={sessionHoverTitle(prompt)}>
-            {projectNameFromCwd(prompt.cwd)} / {sessionName(prompt)}
-          </dd>
+          <dd>{prompt.sessionId}</dd>
         </div>
         <div>
           <dt>Model</dt>

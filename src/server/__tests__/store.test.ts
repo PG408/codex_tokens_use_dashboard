@@ -108,7 +108,6 @@ describe('dashboard store', () => {
     expect(dashboard.sessions[0]).toMatchObject({
       inputTokens: 140,
       cachedInputTokens: 65,
-      sessionName: 'session-a dashboard analysis',
       totalTokens: 330,
       inputCacheHitRate: 65 / 140
     });
@@ -137,8 +136,6 @@ describe('dashboard store', () => {
       'session-b dashboard analysis'
     ]);
     expect(dashboard.prompts[0]).toMatchObject({
-      cwd: '/tmp/session-a',
-      sessionName: 'session-a dashboard analysis',
       totalTokens: 300,
       inputCacheHitRate: 0.5,
       model: 'openai'
@@ -159,33 +156,6 @@ describe('dashboard store', () => {
     expect(dashboard.prompts.map((prompt) => prompt.promptPreview)).toEqual([
       'session-a dashboard analysis'
     ]);
-  });
-
-  it('uses the first real user prompt as the session display name', async () => {
-    const store = await createDashboardStore();
-    const parsed = parsedSession(
-      'session-a',
-      300,
-      '# AGENTS.md instructions for /tmp/session-a'
-    );
-    parsed.prompts.push({
-      promptId: 'session-a:prompt-2',
-      sessionId: 'session-a',
-      startedAt: '2026-06-07T00:07:00.000Z',
-      promptPreview: 'Build the token dashboard',
-      callCount: 0,
-      inputTokens: 0,
-      cachedInputTokens: 0,
-      outputTokens: 0,
-      reasoningOutputTokens: 0,
-      totalTokens: 0
-    });
-
-    store.replaceAll(parsed);
-    const dashboard = store.getDashboardData({});
-
-    expect(dashboard.sessions[0].sessionName).toBe('Build the token dashboard');
-    expect(dashboard.prompts[0].sessionName).toBe('Build the token dashboard');
   });
 
   it('keeps duplicate session ids from different source files represented', async () => {
