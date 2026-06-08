@@ -8,7 +8,7 @@
     "build": "npm run build:server && vite build",
     "build:server": "tsc -p tsconfig.server-build.json",
     "build:macos": "./script/build_macos_app.sh",
-    "package:share": "npm run build && rm -f codex-token-monitor-mvp.zip && zip -r codex-token-monitor-mvp.zip README.md docs/images/dashboard-overview.jpg start.command package.json package-lock.json index.html vite.config.ts tsconfig.json tsconfig.node.json tsconfig.server-build.json src dist dist-server",
+    "package:share": "npm run build && rm -f codex-token-monitor-mvp.zip && zip -r codex-token-monitor-mvp.zip README.md docs/images/dashboard-overview.jpg start.command package.json package-lock.json index.html vite.config.ts tsconfig.json tsconfig.node.json tsconfig.server-build.json Package.swift Assets Sources script src dist dist-server",
     "start": "node dist-server/server/index.js",
     "test": "vitest run",
     "test:watch": "vitest",

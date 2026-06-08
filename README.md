@@ -10,15 +10,28 @@ Codex Token Monitor is a local-only dashboard for inspecting token usage from Co
 - Shows token usage by time, session, prompt, and token composition.
 - Keeps data on the local machine. It does not upload session data.
 
-## Quick Start On macOS
+## Quick Start From Release
 
 1. Install Node.js LTS from `https://nodejs.org/`.
-2. Unzip the app folder.
-3. Double-click `start.command`.
-4. Open `http://127.0.0.1:4317` if the browser does not open automatically.
-5. Click `Refresh` in the dashboard.
+2. Download the macOS app zip from the GitHub release.
+3. Unzip it and double-click `Codex Token Monitor.app`.
+4. Click `Refresh` in the dashboard.
 
-The terminal window keeps the local server running. Close the terminal window or press `Control-C` to stop the app.
+The current macOS app is ad-hoc signed and not notarized. If macOS blocks the first launch because the developer cannot be verified, right-click the app, choose `Open`, and confirm once.
+
+Node.js is still required because the app shell starts the existing local Node server helper.
+
+## Quick Start From Source
+
+Run these commands from the repository:
+
+```sh
+npm install
+npm run build:macos
+open "dist-macos/Codex Token Monitor.app"
+```
+
+This builds a SwiftUI macOS shell that embeds the dashboard in WKWebView and starts the Node helper locally.
 
 ## Command-Line Start
 
@@ -31,18 +44,6 @@ npm start
 ```
 
 Then open `http://127.0.0.1:4317`.
-
-## macOS App Shell
-
-This repository also includes a SwiftUI macOS shell that embeds the dashboard in WKWebView and starts the existing Node helper locally.
-
-Run:
-
-```sh
-npm run build:macos
-```
-
-This creates `dist-macos/Codex Token Monitor.app`. Node.js is still required on the Mac because the app shell launches the existing Node server helper.
 
 ## Configuration
 
@@ -78,3 +79,13 @@ npm run package:share
 ```
 
 This creates `codex-token-monitor-mvp.zip`. The package includes built `dist/` and `dist-server/` output, plus source files for rebuilding if needed.
+
+## Build The macOS App
+
+Run:
+
+```sh
+npm run build:macos
+```
+
+This creates `dist-macos/Codex Token Monitor.app`. The app is suitable for local sharing and testing, but it is not a notarized public distribution build.
