@@ -32,6 +32,18 @@ npm start
 
 Then open `http://127.0.0.1:4317`.
 
+## macOS App Shell
+
+This repository also includes a SwiftUI macOS shell that embeds the dashboard in WKWebView and starts the existing Node helper locally.
+
+Run:
+
+```sh
+npm run build:macos
+```
+
+This creates `dist-macos/Codex Token Monitor.app`. Node.js is still required on the Mac because the app shell launches the existing Node server helper.
+
 ## Configuration
 
 The default data source is:

@@ -1,4 +1,5 @@
 .superpowers/
+.build/
 node_modules/
 dist/
 dist-server/
@@ -9,3 +10,4 @@ dist-server/
 *.zip
 codex-token-monitor-mvp/
 .data/
+dist-macos/
